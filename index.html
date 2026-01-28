@@ -138,8 +138,8 @@ STOCKS.forEach(a=>{
 
 let ANALYSE_MODELL="ausgeglichen";
 let chart;
-const WINDOW=10; // LSTM Fenstergröße
-const MODELS={}; // persistent LSTM Modelle
+const WINDOW=10;
+const MODELS={};
 
 function setMode(m){
   ANALYSE_MODELL=m;
@@ -155,17 +155,17 @@ function showTab(id){
 
 function drawChartWithForecast(prices, forecast) {
   if(chart) chart.destroy();
-  const labels = [];
+  const labels=[];
   for(let i=1;i<=prices.length;i++) labels.push(`T${i}`);
   for(let i=1;i<=forecast.length;i++) labels.push(`F${i}`);
 
-  chart = new Chart(document.getElementById("chart"),{
+  chart=new Chart(document.getElementById("chart"),{
     type:"line",
     data:{
       labels,
       datasets:[
-        {label:"Kurs (CHF)", data:[...prices, ...Array(forecast.length).fill(null)], borderColor:"#00ccaa", tension:0.3},
-        {label:"KI-LSTM-Prognose (CHF)", data:[...Array(prices.length).fill(null), ...forecast], borderColor:"#ffaa55", tension:0.3}
+        {label:"Kurs (CHF)", data:[...prices,...Array(forecast.length).fill(null)], borderColor:"#00ccaa", tension:0.3},
+        {label:"KI-LSTM-Prognose (CHF)", data:[...Array(prices.length).fill(null),...forecast], borderColor:"#ffaa55", tension:0.3}
       ]
     },
     options:{responsive:true}
@@ -173,40 +173,37 @@ function drawChartWithForecast(prices, forecast) {
 }
 
 async function fetchStockData(symbol, days){
-    const token = "d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-    const now = Math.floor(Date.now()/1000);
-    const from = now - days*24*3600;
-    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${token}`;
+    const token="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
+    const now=Math.floor(Date.now()/1000);
+    const from=now-days*24*3600;
+    const url=`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${token}`;
     try{
-        const res = await fetch(url);
-        const data = await res.json();
-        if(!data || data.s!=="ok" || !data.c) throw new Error("Keine Daten");
+        const res=await fetch(url);
+        const data=await res.json();
+        if(!data||data.s!=="ok"||!data.c) throw new Error("Keine Daten");
         return data.c;
     } catch(e){
         const arr=[];
-        let base = 50+Math.random()*250;
-        for(let i=0;i<days;i++){
-            base += (Math.random()-0.5)*2;
-            arr.push(base);
-        }
+        let base=50+Math.random()*250;
+        for(let i=0;i<days;i++){ base+=(Math.random()-0.5)*2; arr.push(base);}
         return arr;
     }
 }
 
 async function fetchUSDtoCHF(){
     try{
-        const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=CHF');
-        const data = await res.json();
-        return data.rates.CHF || 0.93;
+        const res=await fetch('https://api.exchangerate.host/latest?base=USD&symbols=CHF');
+        const data=await res.json();
+        return data.rates.CHF||0.93;
     } catch(e){ return 0.93; }
 }
 
-// Load or create persistent LSTM model
 async function loadOrCreateModel(stock){
     if(MODELS[stock]) return MODELS[stock];
     let model;
     try{
-        model = await tf.loadLayersModel('localstorage://model_' + stock);
+        model=await tf.loadLayersModel('localstorage://model_'+stock);
+        model.compile({optimizer:'adam',loss:'meanSquaredError'}); // ⚠️ Wichtig
     } catch(e){
         model=tf.sequential();
         model.add(tf.layers.lstm({units:32,inputShape:[WINDOW,1]}));
@@ -218,7 +215,7 @@ async function loadOrCreateModel(stock){
 }
 
 async function saveModel(model, stock){
-    await model.save('localstorage://model_' + stock);
+    await model.save('localstorage://model_'+stock);
 }
 
 async function predictWithLSTM(prices, forecastDays){
@@ -238,7 +235,6 @@ async function predictWithLSTM(prices, forecastDays){
 
     const model=await loadOrCreateModel(select.value);
     await model.fit(xs,ys,{epochs:50,verbose:0});
-
     await saveModel(model, select.value);
 
     let lastWindow=normPrices.slice(-WINDOW);
