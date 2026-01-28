@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – KI-Prognose</title>
+<title>YANNIC KÖBI AKTIEN HANDEL AG – KI-LSTM-Prognose</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
@@ -33,7 +33,7 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;}
 
 <body>
 
-<h1>YANNIC KÖBI AKTIEN HANDEL AG – KI-Prognose</h1>
+<h1>YANNIC KÖBI AKTIEN HANDEL AG – KI-LSTM-Prognose</h1>
 <div class="subtitle">Aktienanalyse & Entscheidungsunterstützung (CHF)</div>
 
 <div class="controls">
@@ -103,30 +103,30 @@ Keine Anlageberatung – nur Analyse & Simulation
 <script>
 "use strict";
 
-// ~100 Aktien
-const STOCKS = [
-  { s:"AAPL",n:"Apple" },{ s:"MSFT",n:"Microsoft" },{ s:"NVDA",n:"NVIDIA" },{ s:"TSLA",n:"Tesla" },
-  { s:"AMZN",n:"Amazon" },{ s:"GOOGL",n:"Alphabet" },{ s:"META",n:"Meta Platforms" },{ s:"NFLX",n:"Netflix" },
-  { s:"INTC",n:"Intel" },{ s:"AMD",n:"AMD" },{ s:"BABA",n:"Alibaba" },{ s:"DIS",n:"Disney" },
-  { s:"KO",n:"Coca‑Cola" },{ s:"PEP",n:"PepsiCo" },{ s:"JNJ",n:"Johnson & Johnson" },{ s:"PG",n:"Procter & Gamble" },
-  { s:"V",n:"Visa" },{ s:"MA",n:"Mastercard" },{ s:"PYPL",n:"PayPal" },{ s:"CRM",n:"Salesforce" },
-  { s:"UBER",n:"Uber" },{ s:"LYFT",n:"Lyft" },{ s:"SQ",n:"Block (Square)" },{ s:"SHOP",n:"Shopify" },
-  { s:"ADBE",n:"Adobe" },{ s:"ORCL",n:"Oracle" },{ s:"CSCO",n:"Cisco" },{ s:"IBM",n:"IBM" },
-  { s:"QCOM",n:"Qualcomm" },{ s:"TXN",n:"Texas Instruments" },{ s:"AVGO",n:"Broadcom" },{ s:"ACN",n:"Accenture" },
-  { s:"T",n:"AT&T" },{ s:"VZ",n:"Verizon" },{ s:"CMCSA",n:"Comcast" },{ s:"MCD",n:"McDonalds" },
-  { s:"SBUX",n:"Starbucks" },{ s:"NKE",n:"Nike" },{ s:"LOW",n:"Lowe's" },{ s:"HD",n:"Home Depot" },
-  { s:"WMT",n:"Walmart" },{ s:"TGT",n:"Target" },{ s:"COST",n:"Costco" },{ s:"MDLZ",n:"Mondelez" },
-  { s:"GIS",n:"General Mills" },{ s:"CL",n:"Colgate‑Palmolive" },{ s:"KMB",n:"Kimberly‑Clark" },{ s:"CVX",n:"Chevron" },
-  { s:"XOM",n:"Exxon Mobil" },{ s:"BP",n:"BP" },{ s:"TOT",n:"TotalEnergies" },{ s:"RDS.A",n:"Shell" },
-  { s:"PFE",n:"Pfizer" },{ s:"MRK",n:"Merck" },{ s:"ABT",n:"Abbott Labs" },{ s:"LLY",n:"Eli Lilly" },
-  { s:"BMY",n:"Bristol‑Myers" },{ s:"AMGN",n:"Amgen" },{ s:"UNH",n:"UnitedHealth" },{ s:"ANTM",n:"Anthem" },
-  { s:"CVS",n:"CVS Health" },{ s:"C",n:"Citigroup" },{ s:"JPM",n:"JPMorgan Chase" },{ s:"BAC",n:"Bank of America" },
-  { s:"WFC",n:"Wells Fargo" },{ s:"GS",n:"Goldman Sachs" },{ s:"MS",n:"Morgan Stanley" },{ s:"BLK",n:"BlackRock" },
-  { s:"SCHW",n:"Charles Schwab" },{ s:"RTX",n:"RTX (Raytheon)" },{ s:"BA",n:"Boeing" },{ s:"LMT",n:"Lockheed Martin" },
-  { s:"CAT",n:"Caterpillar" },{ s:"GM",n:"General Motors" },{ s:"F",n:"Ford" },{ s:"HMC",n:"Honda Motor" },
-  { s:"TM",n:"Toyota Motor" },{ s:"SNE",n:"Sony" },{ s:"SAP",n:"SAP" },{ s:"ASML",n:"ASML Holding" },
-  { s:"TSM",n:"Taiwan Semiconductor" },{ s:"NVS",n:"Novartis" },{ s:"SNY",n:"Sanofi" },{ s:"HSBC",n:"HSBC Holdings" },
-  { s:"RIO",n:"Rio Tinto" },{ s:"BHP",n:"BHP Group" },{ s:"VALE",n:"Vale" },{ s:"UL",n:"Unilever" }
+const STOCKS=[
+{s:"AAPL",n:"Apple"},{s:"MSFT",n:"Microsoft"},{s:"NVDA",n:"NVIDIA"},{s:"TSLA",n:"Tesla"},
+{s:"AMZN",n:"Amazon"},{s:"GOOGL",n:"Alphabet"},{s:"META",n:"Meta Platforms"},{s:"NFLX",n:"Netflix"},
+{s:"INTC",n:"Intel"},{s:"AMD",n:"AMD"},{s:"BABA",n:"Alibaba"},{s:"DIS",n:"Disney"},
+{s:"KO",n:"Coca‑Cola"},{s:"PEP",n:"PepsiCo"},{s:"JNJ",n:"Johnson & Johnson"},{s:"PG",n:"Procter & Gamble"},
+{s:"V",n:"Visa"},{s:"MA",n:"Mastercard"},{s:"PYPL",n:"PayPal"},{s:"CRM",n:"Salesforce"},
+{s:"UBER",n:"Uber"},{s:"LYFT",n:"Lyft"},{s:"SQ",n:"Block (Square)"},{s:"SHOP",n:"Shopify"},
+{s:"ADBE",n:"Adobe"},{s:"ORCL",n:"Oracle"},{s:"CSCO",n:"Cisco"},{s:"IBM",n:"IBM"},
+{s:"QCOM",n:"Qualcomm"},{s:"TXN",n:"Texas Instruments"},{s:"AVGO",n:"Broadcom"},{s:"ACN",n:"Accenture"},
+{s:"T",n:"AT&T"},{s:"VZ",n:"Verizon"},{s:"CMCSA",n:"Comcast"},{s:"MCD",n:"McDonalds"},
+{s:"SBUX",n:"Starbucks"},{s:"NKE",n:"Nike"},{s:"LOW",n:"Lowe's"},{s:"HD",n:"Home Depot"},
+{s:"WMT",n:"Walmart"},{s:"TGT",n:"Target"},{s:"COST",n:"Costco"},{s:"MDLZ",n:"Mondelez"},
+{s:"GIS",n:"General Mills"},{s:"CL",n:"Colgate‑Palmolive"},{s:"KMB",n:"Kimberly‑Clark"},{s:"CVX",n:"Chevron"},
+{s:"XOM",n:"Exxon Mobil"},{s:"BP",n:"BP"},{s:"TOT",n:"TotalEnergies"},{s:"RDS.A",n:"Shell"},
+{s:"PFE",n:"Pfizer"},{s:"MRK",n:"Merck"},{s:"ABT",n:"Abbott Labs"},{s:"LLY",n:"Eli Lilly"},
+{s:"BMY",n:"Bristol‑Myers"},{s:"AMGN",n:"Amgen"},{s:"UNH",n:"UnitedHealth"},{s:"ANTM",n:"Anthem"},
+{s:"CVS",n:"CVS Health"},{s:"C",n:"Citigroup"},{s:"JPM",n:"JPMorgan Chase"},{s:"BAC",n:"Bank of America"},
+{s:"WFC",n:"Wells Fargo"},{s:"GS",n:"Goldman Sachs"},{s:"MS",n:"Morgan Stanley"},{s:"BLK",n:"BlackRock"},
+{s:"SCHW",n:"Charles Schwab"},{s:"RTX",n:"RTX (Raytheon)"},{s:"BA",n:"Boeing"},{s:"LMT",n:"Lockheed Martin"},
+{s:"CAT",n:"Caterpillar"},{s:"GM",n:"General Motors"},{s:"F",n:"Ford"},{s:"HMC",n:"Honda Motor"},
+{s:"TM",n:"Toyota Motor"},{s:"SNE",n:"Sony"},{s:"SAP",n:"SAP"},{s:"ASML",n:"ASML Holding"},
+{s:"TSM",n:"Taiwan Semiconductor"},{s:"NVS",n:"Novartis"},{s:"SNY",n:"Sanofi"},{s:"HSBC",n:"HSBC Holdings"},
+{s:"RIO",n:"Rio Tinto"},{s:"BHP",n:"BHP Group"},{s:"VALE",n:"Vale"},{s:"UL",n:"Unilever"},
+{s:"NESN.SW",n:"Nestlé"},{s:"ROG.SW",n:"Roche"}
 ];
 
 const select=document.getElementById("stockSelect");
@@ -138,6 +138,8 @@ STOCKS.forEach(a=>{
 
 let ANALYSE_MODELL="ausgeglichen";
 let chart;
+const WINDOW=10; // LSTM Fenstergröße
+const MODELS={}; // persistent LSTM Modelle
 
 function setMode(m){
   ANALYSE_MODELL=m;
@@ -149,24 +151,6 @@ function setMode(m){
 function showTab(id){
   document.querySelectorAll(".tabbox").forEach(b=>b.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
-}
-
-function EMA(data,p){
-  if(!data.length) return 0;
-  const k=2/(p+1);
-  let e=data[0];
-  for(let i=1;i<data.length;i++) e=data[i]*k+e*(1-k);
-  return e;
-}
-
-function RSI(prices){
-  if(prices.length<15) return 50;
-  let g=0,l=0;
-  for(let i=prices.length-15;i<prices.length-1;i++){
-    const d=prices[i+1]-prices[i];
-    d>0?g+=d:l-=d;
-  }
-  return 100-(100/(1+(g/(l||1))));
 }
 
 function drawChartWithForecast(prices, forecast) {
@@ -181,135 +165,136 @@ function drawChartWithForecast(prices, forecast) {
       labels,
       datasets:[
         {label:"Kurs (CHF)", data:[...prices, ...Array(forecast.length).fill(null)], borderColor:"#00ccaa", tension:0.3},
-        {label:"KI-Prognose (CHF)", data:[...Array(prices.length).fill(null), ...forecast], borderColor:"#ffaa55", tension:0.3}
+        {label:"KI-LSTM-Prognose (CHF)", data:[...Array(prices.length).fill(null), ...forecast], borderColor:"#ffaa55", tension:0.3}
       ]
     },
     options:{responsive:true}
   });
 }
 
-// Finnhub API
-async function fetchStockData(symbol, days) {
-  const token = "d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-  const now = Math.floor(Date.now()/1000);
-  const from = now - days*24*3600;
-  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${token}`;
-
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    if(!data || data.s !== "ok" || !data.c || data.c.length===0){
-      const dummy = [];
-      for(let i=0;i<days;i++) dummy.push(100 + Math.sin(i/6)*5 + i*0.05);
-      return dummy;
+async function fetchStockData(symbol, days){
+    const token = "d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
+    const now = Math.floor(Date.now()/1000);
+    const from = now - days*24*3600;
+    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${token}`;
+    try{
+        const res = await fetch(url);
+        const data = await res.json();
+        if(!data || data.s!=="ok" || !data.c) throw new Error("Keine Daten");
+        return data.c;
+    } catch(e){
+        const arr=[];
+        let base = 50+Math.random()*250;
+        for(let i=0;i<days;i++){
+            base += (Math.random()-0.5)*2;
+            arr.push(base);
+        }
+        return arr;
     }
-    return data.c;
-  } catch(e){
-    const dummy = [];
-    for(let i=0;i<days;i++) dummy.push(100 + Math.sin(i/6)*5 + i*0.05);
-    return dummy;
-  }
 }
 
-// USD → CHF
-async function fetchUSDtoCHF() {
-  try{
-    const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=CHF');
-    const data = await res.json();
-    return data.rates.CHF || 0.93;
-  } catch(e){ return 0.93; }
+async function fetchUSDtoCHF(){
+    try{
+        const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=CHF');
+        const data = await res.json();
+        return data.rates.CHF || 0.93;
+    } catch(e){ return 0.93; }
 }
 
-// KI-Prognose
-async function predictWithAI(prices, forecastDays=7){
-  const maxPrice = Math.max(...prices);
-  const minPrice = Math.min(...prices);
-  const normPrices = prices.map(p => (p-minPrice)/(maxPrice-minPrice));
-
-  const X = [];
-  const Y = [];
-  for(let i=0;i<normPrices.length-5;i++){
-    X.push(normPrices.slice(i,i+5));
-    Y.push(normPrices[i+5]);
-  }
-
-  const xs = tf.tensor2d(X);
-  const ys = tf.tensor2d(Y, [Y.length,1]);
-
-  const model = tf.sequential();
-  model.add(tf.layers.dense({units:10, activation:'relu', inputShape:[5]}));
-  model.add(tf.layers.dense({units:1}));
-
-  model.compile({optimizer:'adam', loss:'meanSquaredError'});
-  await model.fit(xs, ys, {epochs:50, verbose:0});
-
-  let lastWindow = normPrices.slice(-5);
-  const forecast = [];
-  for(let i=0;i<forecastDays;i++){
-    const input = tf.tensor2d([lastWindow]);
-    let pred = model.predict(input).dataSync()[0];
-    forecast.push(pred*(maxPrice-minPrice)+minPrice);
-    lastWindow = lastWindow.slice(1);
-    lastWindow.push(pred);
-  }
-  return forecast;
+// Load or create persistent LSTM model
+async function loadOrCreateModel(stock){
+    if(MODELS[stock]) return MODELS[stock];
+    let model;
+    try{
+        model = await tf.loadLayersModel('localstorage://model_' + stock);
+    } catch(e){
+        model=tf.sequential();
+        model.add(tf.layers.lstm({units:32,inputShape:[WINDOW,1]}));
+        model.add(tf.layers.dense({units:1}));
+        model.compile({optimizer:'adam',loss:'meanSquaredError'});
+    }
+    MODELS[stock]=model;
+    return model;
 }
 
-async function analyze() {
-  document.getElementById("status").textContent = "Analyse läuft…";
-  try {
-    const symbol = select.value;
-    const days = parseInt(document.getElementById("timeSelect").value,10);
-
-    const [pricesUSD, rate] = await Promise.all([
-      fetchStockData(symbol, days),
-      fetchUSDtoCHF()
-    ]);
-
-    const prices = pricesUSD.map(p => p*rate);
-    const rsi = RSI(prices);
-
-    const forecastDays = days; // gleiche Länge wie Auswahl
-    const forecast = await predictWithAI(prices, forecastDays);
-
-    drawChartWithForecast(prices, forecast);
-
-    const last = prices.at(-1);
-    const pred = forecast.at(-1);
-    const diff = (pred-last)/last;
-    const signal = diff>0.07?"KAUFEN":diff<-0.07?"VERKAUFEN":"HALTEN";
-    const cls = signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
-
-    document.getElementById("confidence").textContent =
-      Math.abs(diff)>0.1?"Hoch":Math.abs(diff)>0.05?"Mittel":"Niedrig";
-
-    document.getElementById("result").innerHTML = `
-      <tr>
-        <td>${last.toFixed(2)}</td>
-        <td>${pred.toFixed(2)}</td>
-        <td class="${cls}">${signal}</td>
-        <td>${(Math.abs(diff)*100).toFixed(1)}%</td>
-      </tr>`;
-
-    document.getElementById("explanation").innerHTML =
-      `RSI: ${rsi.toFixed(1)}<br>
-       Analysemodell: ${document.getElementById("mode").textContent}<br>
-       Prognose für ${forecastDays} Tage<br>
-       Wechselkurs: ${rate.toFixed(2)} CHF/USD`;
-
-    document.getElementById("status").textContent = "Analyse abgeschlossen";
-
-  } catch(err){
-    document.getElementById("status").textContent = "Fehler: " + err.message;
-  }
+async function saveModel(model, stock){
+    await model.save('localstorage://model_' + stock);
 }
 
-function openBuyPage(){
-  window.open(`https://finance.yahoo.com/quote/${select.value}`,"_blank");
+async function predictWithLSTM(prices, forecastDays){
+    const maxPrice=Math.max(...prices);
+    const minPrice=Math.min(...prices);
+    const range=maxPrice-minPrice||1;
+    const normPrices=prices.map(p=>(p-minPrice)/range);
+
+    const X=[],Y=[];
+    for(let i=0;i<normPrices.length-WINDOW;i++){
+        X.push(normPrices.slice(i,i+WINDOW));
+        Y.push(normPrices[i+WINDOW]);
+    }
+
+    const xs=tf.tensor3d(X.map(x=>x.map(v=>[v])));
+    const ys=tf.tensor2d(Y,[Y.length,1]);
+
+    const model=await loadOrCreateModel(select.value);
+    await model.fit(xs,ys,{epochs:50,verbose:0});
+
+    await saveModel(model, select.value);
+
+    let lastWindow=normPrices.slice(-WINDOW);
+    const forecast=[];
+    for(let i=0;i<forecastDays;i++){
+        const input=tf.tensor3d([lastWindow.map(v=>[v])]);
+        let pred=model.predict(input).dataSync()[0];
+        pred=Math.max(0,Math.min(1,pred));
+        forecast.push(pred*range+minPrice);
+        lastWindow.shift();
+        lastWindow.push(pred);
+    }
+    return forecast;
 }
+
+async function analyze(){
+    document.getElementById("status").textContent="Analyse läuft…";
+    try{
+        const symbol=select.value;
+        const days=parseInt(document.getElementById("timeSelect").value,10);
+        const [pricesUSD, rate]=await Promise.all([fetchStockData(symbol, days),fetchUSDtoCHF()]);
+        const prices=pricesUSD.map(p=>p*rate);
+        const forecast=await predictWithLSTM(prices,days);
+
+        drawChartWithForecast(prices,forecast);
+
+        const last=prices.at(-1);
+        const pred=forecast.at(-1);
+        const diff=(pred-last)/last;
+        const signal=diff>0.07?"KAUFEN":diff<-0.07?"VERKAUFEN":"HALTEN";
+        const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
+
+        document.getElementById("confidence").textContent=
+            Math.abs(diff)>0.1?"Hoch":Math.abs(diff)>0.05?"Mittel":"Niedrig";
+
+        document.getElementById("result").innerHTML=`
+            <tr>
+                <td>${last.toFixed(2)}</td>
+                <td>${pred.toFixed(2)}</td>
+                <td class="${cls}">${signal}</td>
+                <td>${(Math.abs(diff)*100).toFixed(1)}%</td>
+            </tr>`;
+
+        document.getElementById("explanation").innerHTML=
+            `Analysemodell: ${ANALYSE_MODELL}<br>
+             Prognose für ${days} Tage<br>
+             Wechselkurs: ${rate.toFixed(2)} CHF/USD`;
+
+        document.getElementById("status").textContent="Analyse abgeschlossen";
+    } catch(err){
+        document.getElementById("status").textContent="Fehler: "+err.message;
+    }
+}
+
+function openBuyPage(){window.open(`https://finance.yahoo.com/quote/${select.value}`,"_blank");}
+
 </script>
-
 </body>
 </html>
-
-
