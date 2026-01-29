@@ -2,295 +2,159 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – KI-LSTM-Prognose</title>
+<title>KI Aktienanalyse PRO</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
 
 <style>
-body{background:#121212;color:#d8f3ef;font-family:Arial, Helvetica, sans-serif;margin:0;padding:16px;}
-h1{text-align:center;margin:8px 0;font-size:1.8rem;}
-.subtitle{text-align:center;font-size:0.85rem;color:#a8d8d0;margin-bottom:16px;}
-.controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-select,button{background:#1b1b1b;color:#d8f3ef;border:1px solid #00ccaa;padding:6px 12px;border-radius:6px;cursor:pointer;}
-button:hover{background:#00ccaa;color:#0b0b0b;}
-.info{display:flex;justify-content:center;gap:20px;font-size:0.9rem;margin-bottom:10px;}
-.status{text-align:center;font-weight:bold;margin-bottom:10px;}
-canvas{max-width:1200px;margin:20px auto;display:block;background:#1a1a1a;border-radius:8px;padding:10px;}
-.tabs{display:flex;justify-content:center;gap:10px;margin-top:10px;}
-.tabs button{background:#1b1b1b;border:1px solid #00ccaa;}
-.tabbox{max-width:1200px;margin:12px auto;background:#1a1a1a;border:1px solid #00ccaa;padding:12px;border-radius:6px;}
-.hidden{display:none;}
-table{width:100%;border-collapse:collapse;margin-top:10px;}
-th,td{border:1px solid #00ccaa;padding:6px;text-align:center;}
-.footer{text-align:center;font-size:0.8rem;color:#9fcfc8;margin-top:14px;}
-.buy{color:#00ff88;font-weight:bold;}
-.sell{color:#ff6666;font-weight:bold;}
-.hold{color:#ffaa55;font-weight:bold;}
+body{
+  background:#0f131a;
+  color:#e6f7f4;
+  font-family:Arial,Helvetica,sans-serif;
+  margin:0;
+  padding:16px;
+}
+h1{text-align:center}
+.controls{text-align:center;margin-bottom:10px}
+select,button{
+  background:#161c26;
+  color:#e6f7f4;
+  border:1px solid #00c2a8;
+  padding:6px 10px;
+  border-radius:6px;
+}
+button:hover{background:#00c2a8;color:#000}
+.status{text-align:center;font-weight:bold;margin:10px}
+.buy{color:#00ff88}
+.sell{color:#ff6666}
+.hold{color:#ffaa55}
+canvas{max-width:1200px;margin:auto;display:block}
 </style>
 </head>
 
 <body>
 
-<h1>YANNIC KÖBI AKTIEN HANDEL AG – KI-LSTM-Prognose</h1>
-<div class="subtitle">Aktienanalyse & Entscheidungsunterstützung (CHF)</div>
+<h1>📈 KI Aktienanalyse PRO</h1>
 
 <div class="controls">
-  <select id="stockSelect"></select>
-  <select id="timeSelect">
-    <option value="30">1 Monat</option>
-    <option value="60">2 Monate</option>
-    <option value="90" selected>3 Monate</option>
-  </select>
+<select id="stock">
+  <option value="AAPL">Apple</option>
+  <option value="MSFT">Microsoft</option>
+  <option value="NVDA">NVIDIA</option>
+  <option value="TSLA">Tesla</option>
+</select>
+<button onclick="analyze()">Analyse starten</button>
 </div>
 
-<div class="controls">
-  <button onclick="setMode('vorsichtig')">Vorsichtig</button>
-  <button onclick="setMode('ausgeglichen')">Ausgeglichen</button>
-  <button onclick="setMode('chancen')">Chancenorientiert</button>
-</div>
-
-<div class="controls">
-  <button onclick="analyze()">Analyse durchführen</button>
-  <button onclick="openBuyPage()">Externe Kursansicht</button>
-</div>
-
-<div class="info">
-  <div>Analysemodell: <b id="mode">Ausgeglichen</b></div>
-  <div>Konfidenz: <b id="confidence">–</b></div>
-</div>
-
-<div class="status" id="status">System bereit</div>
-
+<div class="status" id="status">Bereit</div>
 <canvas id="chart"></canvas>
 
-<table>
-<thead>
-<tr>
-  <th>Aktueller Kurs (CHF)</th>
-  <th>Prognose (CHF)</th>
-  <th>Signal</th>
-  <th>Abweichung</th>
-</tr>
-</thead>
-<tbody id="result"></tbody>
-</table>
-
-<div class="tabs">
-  <button onclick="showTab('analysis')">Analyse</button>
-  <button onclick="showTab('news')">Nachrichten</button>
-  <button onclick="showTab('fundamental')">Fundamentales</button>
-</div>
-
-<div id="analysis" class="tabbox">
-  <div id="explanation">–</div>
-</div>
-
-<div id="news" class="tabbox hidden">
-  <div id="newsText">Keine relevanten Marktmeldungen.</div>
-</div>
-
-<div id="fundamental" class="tabbox hidden">
-  Interne Stabilitäts- und Plausibilitätsprüfung auf Basis historischer Daten.
-</div>
-
-<div class="footer">
-© 2026 YANNIC KÖBI AKTIEN HANDEL AG<br>
-Keine Anlageberatung – nur Analyse & Simulation
-</div>
-
 <script>
-"use strict";
-
-const STOCKS=[
-{s:"AAPL",n:"Apple"},{s:"MSFT",n:"Microsoft"},{s:"NVDA",n:"NVIDIA"},{s:"TSLA",n:"Tesla"},
-{s:"AMZN",n:"Amazon"},{s:"GOOGL",n:"Alphabet"},{s:"META",n:"Meta Platforms"},{s:"NFLX",n:"Netflix"},
-{s:"INTC",n:"Intel"},{s:"AMD",n:"AMD"},{s:"BABA",n:"Alibaba"},{s:"DIS",n:"Disney"},
-{s:"KO",n:"Coca‑Cola"},{s:"PEP",n:"PepsiCo"},{s:"JNJ",n:"Johnson & Johnson"},{s:"PG",n:"Procter & Gamble"},
-{s:"V",n:"Visa"},{s:"MA",n:"Mastercard"},{s:"PYPL",n:"PayPal"},{s:"CRM",n:"Salesforce"},
-{s:"UBER",n:"Uber"},{s:"LYFT",n:"Lyft"},{s:"SQ",n:"Block (Square)"},{s:"SHOP",n:"Shopify"},
-{s:"ADBE",n:"Adobe"},{s:"ORCL",n:"Oracle"},{s:"CSCO",n:"Cisco"},{s:"IBM",n:"IBM"},
-{s:"QCOM",n:"Qualcomm"},{s:"TXN",n:"Texas Instruments"},{s:"AVGO",n:"Broadcom"},{s:"ACN",n:"Accenture"},
-{s:"T",n:"AT&T"},{s:"VZ",n:"Verizon"},{s:"CMCSA",n:"Comcast"},{s:"MCD",n:"McDonalds"},
-{s:"SBUX",n:"Starbucks"},{s:"NKE",n:"Nike"},{s:"LOW",n:"Lowe's"},{s:"HD",n:"Home Depot"},
-{s:"WMT",n:"Walmart"},{s:"TGT",n:"Target"},{s:"COST",n:"Costco"},{s:"MDLZ",n:"Mondelez"},
-{s:"GIS",n:"General Mills"},{s:"CL",n:"Colgate‑Palmolive"},{s:"KMB",n:"Kimberly‑Clark"},{s:"CVX",n:"Chevron"},
-{s:"XOM",n:"Exxon Mobil"},{s:"BP",n:"BP"},{s:"TOT",n:"TotalEnergies"},{s:"RDS.A",n:"Shell"},
-{s:"PFE",n:"Pfizer"},{s:"MRK",n:"Merck"},{s:"ABT",n:"Abbott Labs"},{s:"LLY",n:"Eli Lilly"},
-{s:"BMY",n:"Bristol‑Myers"},{s:"AMGN",n:"Amgen"},{s:"UNH",n:"UnitedHealth"},{s:"ANTM",n:"Anthem"},
-{s:"CVS",n:"CVS Health"},{s:"C",n:"Citigroup"},{s:"JPM",n:"JPMorgan Chase"},{s:"BAC",n:"Bank of America"},
-{s:"WFC",n:"Wells Fargo"},{s:"GS",n:"Goldman Sachs"},{s:"MS",n:"Morgan Stanley"},{s:"BLK",n:"BlackRock"},
-{s:"SCHW",n:"Charles Schwab"},{s:"RTX",n:"RTX (Raytheon)"},{s:"BA",n:"Boeing"},{s:"LMT",n:"Lockheed Martin"},
-{s:"CAT",n:"Caterpillar"},{s:"GM",n:"General Motors"},{s:"F",n:"Ford"},{s:"HMC",n:"Honda Motor"},
-{s:"TM",n:"Toyota Motor"},{s:"SNE",n:"Sony"},{s:"SAP",n:"SAP"},{s:"ASML",n:"ASML Holding"},
-{s:"TSM",n:"Taiwan Semiconductor"},{s:"NVS",n:"Novartis"},{s:"SNY",n:"Sanofi"},{s:"HSBC",n:"HSBC Holdings"},
-{s:"RIO",n:"Rio Tinto"},{s:"BHP",n:"BHP Group"},{s:"VALE",n:"Vale"},{s:"UL",n:"Unilever"},
-{s:"NESN.SW",n:"Nestlé"},{s:"ROG.SW",n:"Roche"}
-];
-
-const select=document.getElementById("stockSelect");
-STOCKS.forEach(a=>{
-  const o=document.createElement("option");
-  o.value=a.s; o.textContent=`${a.s} – ${a.n}`;
-  select.appendChild(o);
-});
-
-let ANALYSE_MODELL="ausgeglichen";
+const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
+const WINDOW=20;
 let chart;
-const WINDOW=10;
-const MODELS={};
 
-function setMode(m){
-  ANALYSE_MODELL=m;
-  document.getElementById("mode").textContent=
-    m==="vorsichtig"?"Vorsichtig":
-    m==="chancen"?"Chancenorientiert":"Ausgeglichen";
+// ───────── INDICATORS ─────────
+function EMA(data,p){
+  const k=2/(p+1); let e=data[0];
+  for(let i=1;i<data.length;i++) e=data[i]*k+e*(1-k);
+  return e;
+}
+function RSI(prices){
+  let g=0,l=0;
+  for(let i=prices.length-14;i<prices.length-1;i++){
+    const d=prices[i+1]-prices[i];
+    d>0?g+=d:l-=d;
+  }
+  return 100-(100/(1+(g/(l||1))));
 }
 
-function showTab(id){
-  document.querySelectorAll(".tabbox").forEach(b=>b.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
+// ───────── DATA ─────────
+async function loadPrices(symbol){
+  const now=Math.floor(Date.now()/1000);
+  const from=now-90*86400;
+  const res=await fetch(
+    `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`
+  );
+  const d=await res.json();
+  if(d.s!=="ok") throw new Error("Keine Marktdaten");
+  return d.c;
 }
 
-function drawChartWithForecast(prices, forecast) {
-  if(chart) chart.destroy();
-  const labels=[];
-  for(let i=1;i<=prices.length;i++) labels.push(`T${i}`);
-  for(let i=1;i<=forecast.length;i++) labels.push(`F${i}`);
+// ───────── KI ─────────
+async function predict(prices){
+  const min=Math.min(...prices);
+  const max=Math.max(...prices);
+  const range=max-min||1;
+  const norm=prices.map(p=>(p-min)/range);
 
-  chart=new Chart(document.getElementById("chart"),{
-    type:"line",
-    data:{
-      labels,
-      datasets:[
-        {label:"Kurs (CHF)", data:[...prices,...Array(forecast.length).fill(null)], borderColor:"#00ccaa", tension:0.3},
-        {label:"KI-LSTM-Prognose (CHF)", data:[...Array(prices.length).fill(null),...forecast], borderColor:"#ffaa55", tension:0.3}
-      ]
-    },
-    options:{responsive:true}
-  });
+  const X=[],Y=[];
+  for(let i=0;i<norm.length-WINDOW;i++){
+    X.push(norm.slice(i,i+WINDOW).map(v=>[v]));
+    Y.push(norm[i+WINDOW]);
+  }
+
+  const xs=tf.tensor3d(X);
+  const ys=tf.tensor2d(Y,[Y.length,1]);
+
+  const model=tf.sequential();
+  model.add(tf.layers.lstm({units:64,inputShape:[WINDOW,1]}));
+  model.add(tf.layers.dense({units:1}));
+  model.compile({optimizer:"adam",loss:"meanSquaredError"});
+  await model.fit(xs,ys,{epochs:35,verbose:0});
+
+  let win=norm.slice(-WINDOW);
+  const forecast=[];
+  for(let i=0;i<10;i++){
+    const p=model.predict(tf.tensor3d([win.map(v=>[v])])).dataSync()[0];
+    win.shift(); win.push(p);
+    forecast.push(p*range+min);
+  }
+  return forecast;
 }
 
-async function fetchStockData(symbol, days){
-    const token="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-    const now=Math.floor(Date.now()/1000);
-    const from=now-days*24*3600;
-    const url=`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${token}`;
-    try{
-        const res=await fetch(url);
-        const data=await res.json();
-        if(!data||data.s!=="ok"||!data.c) throw new Error("Keine Daten");
-        return data.c;
-    } catch(e){
-        const arr=[];
-        let base=50+Math.random()*250;
-        for(let i=0;i<days;i++){ base+=(Math.random()-0.5)*2; arr.push(base);}
-        return arr;
-    }
-}
-
-async function fetchUSDtoCHF(){
-    try{
-        const res=await fetch('https://api.exchangerate.host/latest?base=USD&symbols=CHF');
-        const data=await res.json();
-        return data.rates.CHF||0.93;
-    } catch(e){ return 0.93; }
-}
-
-async function loadOrCreateModel(stock){
-    if(MODELS[stock]) return MODELS[stock];
-    let model;
-    try{
-        model=await tf.loadLayersModel('localstorage://model_'+stock);
-        model.compile({optimizer:'adam',loss:'meanSquaredError'}); // ⚠️ Wichtig
-    } catch(e){
-        model=tf.sequential();
-        model.add(tf.layers.lstm({units:32,inputShape:[WINDOW,1]}));
-        model.add(tf.layers.dense({units:1}));
-        model.compile({optimizer:'adam',loss:'meanSquaredError'});
-    }
-    MODELS[stock]=model;
-    return model;
-}
-
-async function saveModel(model, stock){
-    await model.save('localstorage://model_'+stock);
-}
-
-async function predictWithLSTM(prices, forecastDays){
-    const maxPrice=Math.max(...prices);
-    const minPrice=Math.min(...prices);
-    const range=maxPrice-minPrice||1;
-    const normPrices=prices.map(p=>(p-minPrice)/range);
-
-    const X=[],Y=[];
-    for(let i=0;i<normPrices.length-WINDOW;i++){
-        X.push(normPrices.slice(i,i+WINDOW));
-        Y.push(normPrices[i+WINDOW]);
-    }
-
-    const xs=tf.tensor3d(X.map(x=>x.map(v=>[v])));
-    const ys=tf.tensor2d(Y,[Y.length,1]);
-
-    const model=await loadOrCreateModel(select.value);
-    await model.fit(xs,ys,{epochs:50,verbose:0});
-    await saveModel(model, select.value);
-
-    let lastWindow=normPrices.slice(-WINDOW);
-    const forecast=[];
-    for(let i=0;i<forecastDays;i++){
-        const input=tf.tensor3d([lastWindow.map(v=>[v])]);
-        let pred=model.predict(input).dataSync()[0];
-        pred=Math.max(0,Math.min(1,pred));
-        forecast.push(pred*range+minPrice);
-        lastWindow.shift();
-        lastWindow.push(pred);
-    }
-    return forecast;
-}
-
+// ───────── MAIN ─────────
 async function analyze(){
+  try{
     document.getElementById("status").textContent="Analyse läuft…";
-    try{
-        const symbol=select.value;
-        const days=parseInt(document.getElementById("timeSelect").value,10);
-        const [pricesUSD, rate]=await Promise.all([fetchStockData(symbol, days),fetchUSDtoCHF()]);
-        const prices=pricesUSD.map(p=>p*rate);
-        const forecast=await predictWithLSTM(prices,days);
+    const symbol=document.getElementById("stock").value;
+    const prices=await loadPrices(symbol);
+    const forecast=await predict(prices);
 
-        drawChartWithForecast(prices,forecast);
+    const last=prices.at(-1);
+    const pred=forecast.at(-1);
+    const ema9=EMA(prices,9);
+    const ema21=EMA(prices,21);
+    const rsi=RSI(prices);
 
-        const last=prices.at(-1);
-        const pred=forecast.at(-1);
-        const diff=(pred-last)/last;
-        const signal=diff>0.07?"KAUFEN":diff<-0.07?"VERKAUFEN":"HALTEN";
-        const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
+    let signal="HALTEN",cls="hold";
+    if(pred>last*1.05 && ema9>ema21 && rsi<70){signal="KAUFEN";cls="buy";}
+    if(pred<last*0.95 && ema9<ema21 && rsi>30){signal="VERKAUFEN";cls="sell";}
 
-        document.getElementById("confidence").textContent=
-            Math.abs(diff)>0.1?"Hoch":Math.abs(diff)>0.05?"Mittel":"Niedrig";
+    document.getElementById("status").innerHTML=
+      `Signal: <span class="${cls}">${signal}</span>
+       | RSI: ${rsi.toFixed(1)}
+       | Trend: ${ema9>ema21?"Aufwärts":"Abwärts"}`;
 
-        document.getElementById("result").innerHTML=`
-            <tr>
-                <td>${last.toFixed(2)}</td>
-                <td>${pred.toFixed(2)}</td>
-                <td class="${cls}">${signal}</td>
-                <td>${(Math.abs(diff)*100).toFixed(1)}%</td>
-            </tr>`;
-
-        document.getElementById("explanation").innerHTML=
-            `Analysemodell: ${ANALYSE_MODELL}<br>
-             Prognose für ${days} Tage<br>
-             Wechselkurs: ${rate.toFixed(2)} CHF/USD`;
-
-        document.getElementById("status").textContent="Analyse abgeschlossen";
-    } catch(err){
-        document.getElementById("status").textContent="Fehler: "+err.message;
-    }
+    if(chart) chart.destroy();
+    chart=new Chart(document.getElementById("chart"),{
+      type:"line",
+      data:{
+        labels:[
+          ...prices.map((_,i)=>"T"+i),
+          ...forecast.map((_,i)=>"F"+i)
+        ],
+        datasets:[
+          {label:"Kurs",data:[...prices,...Array(10).fill(null)],borderColor:"#00c2a8"},
+          {label:"KI Prognose",data:[...Array(prices.length).fill(null),...forecast],borderColor:"#ffaa55"}
+        ]
+      }
+    });
+  }catch(e){
+    document.getElementById("status").textContent="Fehler: "+e.message;
+  }
 }
-
-function openBuyPage(){window.open(`https://finance.yahoo.com/quote/${select.value}`,"_blank");}
-
 </script>
 </body>
 </html>
