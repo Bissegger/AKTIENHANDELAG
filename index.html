@@ -9,10 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
 
 <style>
-body{background:#121212;color:#d8f3ef;font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px}
-h1{text-align:center;margin:8px 0}
+body{background:#121212;color:#d8f3ef;font-family:Arial;margin:0;padding:16px}
+h1{text-align:center;margin:6px 0}
 .subtitle{text-align:center;font-size:.85rem;color:#a8d8d0}
-.controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:10px 0}
 select,button{background:#1b1b1b;color:#d8f3ef;border:1px solid #00ccaa;padding:6px 12px;border-radius:6px;cursor:pointer}
 button:hover{background:#00ccaa;color:#000}
 .status{text-align:center;font-weight:bold;margin:6px}
@@ -22,23 +22,20 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 .buy{color:#00ff88;font-weight:bold}
 .sell{color:#ff6666;font-weight:bold}
 .hold{color:#ffaa55;font-weight:bold}
-.stable{color:#00ff88}
-.medium{color:#ffaa55}
-.risky{color:#ff6666}
+.tabs{display:flex;justify-content:center;gap:10px;margin-top:12px}
+.tabbox{max-width:1200px;margin:10px auto;background:#1a1a1a;border:1px solid #00ccaa;padding:10px;border-radius:6px}
+.hidden{display:none}
+.footer{text-align:center;font-size:.8rem;color:#9fcfc8;margin-top:12px}
 .ok{color:#00ff88}
 .warn{color:#ffaa55}
 .bad{color:#ff6666}
-.tabs{display:flex;justify-content:center;gap:10px;margin-top:12px}
-.tabbox{max-width:1200px;margin:12px auto;background:#1a1a1a;border:1px solid #00ccaa;padding:12px;border-radius:6px}
-.hidden{display:none}
-.footer{text-align:center;font-size:.8rem;color:#9fcfc8;margin-top:14px}
 </style>
 </head>
 
 <body>
 
 <h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
-<div class="subtitle">KI-gestützte Aktienanalyse · Prognose · Stabilität</div>
+<div class="subtitle">KI-gestützte Aktienanalyse (echte Marktdaten)</div>
 
 <div class="controls">
 <select id="stockSelect"></select>
@@ -52,11 +49,11 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 <div class="controls">
 <button onclick="setMode('vorsichtig')">Vorsichtig</button>
 <button onclick="setMode('ausgeglichen')">Ausgeglichen</button>
-<button onclick="setMode('chancen')">Chancen</button>
+<button onclick="setMode('chancen')">Chancenorientiert</button>
 </div>
 
 <div class="controls">
-<button onclick="analyze()">Analyse starten</button>
+<button onclick="analyze()">Analyse durchführen</button>
 <button onclick="exportCSV()">CSV Export</button>
 <button onclick="toggleFav()">⭐ Favorit</button>
 </div>
@@ -70,9 +67,9 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 <thead>
 <tr>
 <th>Aktueller Kurs</th>
-<th>Prognose</th>
+<th>KI-Prognose</th>
 <th>Signal</th>
-<th>Confidence</th>
+<th>Abweichung</th>
 </tr>
 </thead>
 <tbody id="result"></tbody>
@@ -80,31 +77,27 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 
 <div class="tabs">
 <button onclick="showTab('analysis')">Analyse</button>
-<button onclick="showTab('fundamental')">Fundamental</button>
+<button onclick="showTab('fundamental')">Firmen-Stabilität</button>
 </div>
 
 <div id="analysis" class="tabbox">
 <div id="explanation">–</div>
 </div>
 
-<div id="fundamental" class="tabbox hidden"></div>
-
-<div class="footer">
-© 2026 YANNIC KÖBI AKTIEN HANDEL AG · Keine Anlageberatung
+<div id="fundamental" class="tabbox hidden">
+<div id="stability">–</div>
 </div>
+
+<div class="footer">Keine Anlageberatung – Analyse & KI-Simulation</div>
 
 <script>
 "use strict";
 
-/* ===== KONFIG ===== */
+/* ================== API ================== */
 const API_KEY = atob("ZDVvaHFqaHIwMWFqc3Q2cXJqZ2Q1b2hxamhyMDFxamFzdDZxcmsw");
-const WINDOW=20;
-let ANALYSE_MODELL="ausgeglichen";
-let LAST_TREND=null;
-let chart;
 
-/* ===== AKTIEN ===== */
-const STOCKS=[
+/* ================== AKTIENLISTE (DEINE) ================== */
+const STOCKS = [
 {t:"AAPL",n:"Apple Inc."},{t:"MSFT",n:"Microsoft Corporation"},
 {t:"NVDA",n:"NVIDIA Corporation"},{t:"TSLA",n:"Tesla Inc."},
 {t:"AMZN",n:"Amazon.com Inc."},{t:"GOOGL",n:"Alphabet Inc."},
@@ -114,179 +107,147 @@ const STOCKS=[
 {t:"KO",n:"The Coca-Cola Company"},{t:"PEP",n:"PepsiCo Inc."},
 {t:"JNJ",n:"Johnson & Johnson"},{t:"PG",n:"Procter & Gamble Co."},
 {t:"V",n:"Visa Inc."},{t:"MA",n:"Mastercard Inc."},
-{t:"UBER",n:"Uber Technologies Inc."},{t:"SHOP",n:"Shopify Inc."},
 {t:"SAP",n:"SAP SE"},{t:"ASML",n:"ASML Holding N.V."},
 {t:"NESN.SW",n:"Nestlé S.A."},{t:"ROG.SW",n:"Roche Holding AG"}
 ];
 
-const select=document.getElementById("stockSelect");
+const stockSelect=document.getElementById("stockSelect");
 STOCKS.forEach(s=>{
   const o=document.createElement("option");
   o.value=s.t;
   o.textContent=`${s.t} – ${s.n}`;
-  select.appendChild(o);
+  stockSelect.appendChild(o);
 });
 
-/* ===== UI ===== */
-function setMode(m){ANALYSE_MODELL=m}
+/* ================== UI ================== */
+let MODE="ausgeglichen";
+function setMode(m){MODE=m}
 function showTab(id){
   document.querySelectorAll(".tabbox").forEach(b=>b.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
-/* ===== TOOLS ===== */
-function EMA(d,p){const k=2/(p+1);let e=d[0];for(let i=1;i<d.length;i++)e=d[i]*k+e*(1-k);return e;}
-function RSI(p){let g=0,l=0;for(let i=p.length-14;i<p.length-1;i++){const d=p[i+1]-p[i];d>0?g+=d:l-=d;}return 100-(100/(1+(g/(l||1))));}
-function volatility(p){const m=p.reduce((a,b)=>a+b)/p.length;const v=Math.sqrt(p.reduce((s,x)=>s+(x-m)**2,0)/p.length);return (v/m)*100;}
-function stability(v){if(v<2)return["Stabil","stable"];if(v<5)return["Mittel","medium"];return["Instabil","risky"];}
-function thresholds(){if(ANALYSE_MODELL==="vorsichtig")return{buy:.08,sell:-.04};if(ANALYSE_MODELL==="chancen")return{buy:.03,sell:-.08};return{buy:.05,sell:-.05};}
-
-/* ===== MARKTDATEN MIT ECHTEM FALLBACK ===== */
-async function fetchPrices(symbol,days){
+/* ================== MARKTDATEN + FALLBACK ================== */
+async function fetchPrices(sym,days){
   const now=Math.floor(Date.now()/1000);
   const from=now-days*86400;
-
   try{
-    const r=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`);
+    const r=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${sym}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`);
     const d=await r.json();
-    if(d.s==="ok"&&d.c&&d.c.length>=20){
-      localStorage.setItem("LAST_REAL_"+symbol,JSON.stringify(d.c));
-      localStorage.setItem("LAST_TIME_"+symbol,new Date().toLocaleString());
+    if(d.s==="ok" && d.c.length>20){
+      localStorage.setItem("LAST_"+sym,JSON.stringify(d.c));
+      localStorage.setItem("TIME_"+sym,new Date().toLocaleString());
       datatime.textContent="Datenstand: "+new Date().toLocaleString();
       return d.c;
     }
-  }catch(e){}
-
-  const cached=localStorage.getItem("LAST_REAL_"+symbol);
-  const time=localStorage.getItem("LAST_TIME_"+symbol);
-  if(cached){
-    datatime.textContent="Datenstand (Fallback): "+time;
-    return JSON.parse(cached);
+  }catch{}
+  const cache=localStorage.getItem("LAST_"+sym);
+  if(cache){
+    datatime.textContent="Fallback (letzte echte Daten): "+localStorage.getItem("TIME_"+sym);
+    return JSON.parse(cache);
   }
   throw "Keine Marktdaten verfügbar";
 }
 
-/* ===== KI ===== */
+/* ================== KI (LSTM) ================== */
+const WINDOW=20;
 async function predict(prices){
-  status.textContent="🧠 KI wird trainiert…";
   const min=Math.min(...prices),max=Math.max(...prices),r=max-min||1;
-  const n=prices.map(p=>(p-min)/r),X=[],Y=[];
-  for(let i=0;i<n.length-WINDOW;i++){X.push(n.slice(i,i+WINDOW).map(v=>[v]));Y.push(n[i+WINDOW]);}
-  const xs=tf.tensor3d(X),ys=tf.tensor2d(Y,[Y.length,1]);
-
-  let model;
-  try{model=await tf.loadLayersModel("localstorage://model_"+select.value);}
-  catch{
-    model=tf.sequential();
-    model.add(tf.layers.lstm({units:64,dropout:0.2,recurrentDropout:0.2,inputShape:[WINDOW,1]}));
-    model.add(tf.layers.dense({units:1}));
-    model.compile({optimizer:"adam",loss:"mse"});
+  const n=prices.map(p=>(p-min)/r);
+  const X=[],Y=[];
+  for(let i=0;i<n.length-WINDOW;i++){
+    X.push(n.slice(i,i+WINDOW).map(v=>[v]));
+    Y.push(n[i+WINDOW]);
   }
-
-  await model.fit(xs,ys,{epochs:40,batchSize:16,shuffle:true,verbose:0});
-  await model.save("localstorage://model_"+select.value);
-
+  const xs=tf.tensor3d(X),ys=tf.tensor2d(Y,[Y.length,1]);
+  const m=tf.sequential();
+  m.add(tf.layers.lstm({units:32,inputShape:[WINDOW,1]}));
+  m.add(tf.layers.dense({units:1}));
+  m.compile({optimizer:"adam",loss:"mse"});
+  await m.fit(xs,ys,{epochs:25,verbose:0});
   let w=n.slice(-WINDOW),f=[];
-  for(let i=0;i<10;i++){
-    const p=model.predict(tf.tensor3d([w.map(v=>[v])])).dataSync()[0];
-    w.shift();w.push(p);f.push(p*r+min);
+  for(let i=0;i<7;i++){
+    let p=m.predict(tf.tensor3d([w.map(v=>[v])])).dataSync()[0];
+    w.shift(); w.push(p);
+    f.push(p*r+min);
   }
   return f;
 }
 
-/* ===== BACKTEST ===== */
-function backtestAccuracy(prices,forecast){
-  const real=prices.slice(-forecast.length);
-  let err=0;
-  for(let i=0;i<forecast.length;i++){
-    err+=Math.abs((forecast[i]-real[i])/real[i]);
-  }
-  return 100-(err/forecast.length)*100;
+/* ================== STABILITÄTS-ANALYSE ================== */
+function companyStability(prices){
+  const vol = Math.sqrt(prices.reduce((s,p,i,a)=>i? s+(p-a[i-1])**2 : s,0)/prices.length);
+  if(vol<2) return "Sehr stabil (defensives Unternehmen)";
+  if(vol<5) return "Stabil (moderate Schwankungen)";
+  return "Volatil (höheres Risiko)";
 }
 
-/* ===== ANALYSE ===== */
+/* ================== ANALYSE ================== */
 async function analyze(){
   try{
     status.textContent="Analyse läuft…";
-    const prices=await fetchPrices(select.value,+timeSelect.value);
+    const prices=await fetchPrices(stockSelect.value,+timeSelect.value);
     const forecast=await predict(prices);
 
-    const last=prices.at(-1),pred=forecast.at(-1);
-    const ema9=EMA(prices,9),ema21=EMA(prices,21);
-    const trend=ema9>ema21?"Aufwärts":"Abwärts";
-    if(LAST_TREND&&LAST_TREND!==trend)alert("⚠️ Trendwechsel erkannt");
-    LAST_TREND=trend;
-
-    const rsi=RSI(prices),vol=volatility(prices);
-    const [stabText,stabClass]=stability(vol);
+    const last=prices.at(-1);
+    const pred=forecast.at(-1);
     const diff=(pred-last)/last;
-    const t=thresholds();
 
     let signal="HALTEN",cls="hold";
-    if(diff>t.buy&&trend==="Aufwärts"&&rsi<70){signal="KAUFEN";cls="buy";}
-    if(diff<t.sell&&trend==="Abwärts"&&rsi>30){signal="VERKAUFEN";cls="sell";}
+    if(diff>0.05) signal="KAUFEN",cls="buy";
+    if(diff<-0.05) signal="VERKAUFEN",cls="sell";
 
-    const confidence=Math.min(100,Math.abs(diff)*100*2+(trend==="Aufwärts"?10:0)+(5-vol));
-    const accuracy=backtestAccuracy(prices,forecast);
-
-    result.innerHTML=`<tr>
-      <td>${last.toFixed(2)}</td>
-      <td>${pred.toFixed(2)}</td>
-      <td class="${cls}">${signal}</td>
-      <td>${confidence.toFixed(0)}%</td>
-    </tr>`;
+    result.innerHTML=`
+      <tr>
+        <td>${last.toFixed(2)}</td>
+        <td>${pred.toFixed(2)}</td>
+        <td class="${cls}">${signal}</td>
+        <td>${(Math.abs(diff)*100).toFixed(1)}%</td>
+      </tr>`;
 
     explanation.innerHTML=
-      `Trend: ${trend}<br>
-       RSI: ${rsi.toFixed(1)}<br>
-       Modus: ${ANALYSE_MODELL}<br>
-       KI-Genauigkeit (Backtest): ${accuracy.toFixed(1)}%`;
+      `Modus: ${MODE}<br>
+       Prognosehorizont: 7 Tage`;
 
-    fundamental.innerHTML=
-      `<b>Firmen-Stabilität:</b>
-       <span class="${stabClass}">${stabText}</span><br>
-       <b>Volatilität:</b> ${vol.toFixed(2)} %`;
+    stability.textContent = companyStability(prices);
 
-    if(signal==="KAUFEN"&&rsi>70){
-      status.innerHTML+=" ⚠️ Überkauft – mögliches Fehlsignal";
-    }
-
-    status.className="status "+(confidence>70?"ok":confidence>40?"warn":"bad");
-
-    if(chart)chart.destroy();
-    chart=new Chart(chartEl,{
+    if(window.chart) chart.destroy();
+    chart=new Chart(document.getElementById("chart"),{
       type:"line",
       data:{
-        labels:[...prices.map((_,i)=>"T"+i),...forecast.map((_,i)=>"F"+i)],
+        labels:prices.map((_,i)=>i),
         datasets:[
-          {label:"Kurs",data:[...prices,...Array(forecast.length).fill(null)],borderColor:"#00ccaa"},
-          {label:"KI-Prognose",data:[...Array(prices.length).fill(null),...forecast],borderColor:"#ffaa55"}
+          {label:"Kurs",data:prices,borderColor:"#00ccaa"},
+          {label:"KI-Prognose",data:[...Array(prices.length-forecast.length).fill(null),...forecast],borderColor:"#ffaa55"}
         ]
       }
     });
 
-    status.textContent+=" ✓ Analyse abgeschlossen";
+    status.textContent="Analyse abgeschlossen ✓";
   }catch(e){
     status.textContent="Fehler: "+e;
   }
 }
 
+/* ================== EXTRA ================== */
 function exportCSV(){
-  const r=document.querySelector("#result tr");if(!r)return;
-  const c=[...r.children].map(td=>td.innerText);
-  const csv="Aktie,Preis,Prognose,Signal,Confidence\n"+select.value+","+c.join(",");
+  const r=document.querySelector("#result tr");
+  if(!r) return;
+  const d=[...r.children].map(td=>td.innerText);
+  const csv="Aktie,Preis,Prognose,Signal,Abweichung\n"+stockSelect.value+","+d.join(",");
   const b=new Blob([csv],{type:"text/csv"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=select.value+"_analyse.csv";a.click();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);
+  a.download="aktienanalyse.csv";
+  a.click();
 }
+
 function toggleFav(){
   let f=JSON.parse(localStorage.getItem("FAVS")||"[]");
-  f.includes(select.value)?f=f.filter(x=>x!==select.value):f.push(select.value);
+  f.includes(stockSelect.value)?f=f.filter(x=>x!==stockSelect.value):f.push(stockSelect.value);
   localStorage.setItem("FAVS",JSON.stringify(f));
   alert("Favoriten aktualisiert");
 }
-
-setInterval(()=>analyze(),5*60*1000);
 </script>
 </body>
 </html>
-
