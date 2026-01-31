@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – KI Analyse</title>
+<title>YANNIC KÖBI AKTIEN HANDEL AG – Final</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -21,18 +21,18 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 .buy{color:#00ff88;font-weight:bold}
 .sell{color:#ff6666;font-weight:bold}
 .hold{color:#ffaa55;font-weight:bold}
-.newspos{color:#00ff88}
-.newsneu{color:#ffaa55}
-.newsneg{color:#ff6666}
+.pos{color:#00ff88}
+.neu{color:#ffaa55}
+.neg{color:#ff6666}
 .footer{text-align:center;font-size:0.8rem;color:#9fcfc8;margin-top:14px}
-.tabbox{max-width:1200px;margin:10px auto;background:#1a1a1a;border:1px solid #00ccaa;padding:10px;border-radius:6px}
+.box{max-width:1200px;margin:10px auto;background:#1a1a1a;border:1px solid #00ccaa;padding:10px;border-radius:6px}
 </style>
 </head>
 
 <body>
 
 <h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
-<div class="subtitle">Echte Aktienanalyse mit KI & News</div>
+<div class="subtitle">Echte Aktienanalyse · News · KI · Stabilitätsindex</div>
 
 <div class="controls">
 <select id="stock"></select>
@@ -56,16 +56,17 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 <table>
 <thead>
 <tr>
-<th>Aktueller Kurs (CHF)</th>
-<th>Prognose (CHF)</th>
+<th>Kurs (CHF)</th>
+<th>Prognose</th>
 <th>Signal</th>
 <th>Stabilität</th>
+<th>KI-Confidence</th>
 </tr>
 </thead>
 <tbody id="result"></tbody>
 </table>
 
-<div class="tabbox">
+<div class="box">
 <h3>📰 News-Analyse</h3>
 <div id="news">–</div>
 </div>
@@ -77,11 +78,9 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 <script>
 "use strict";
 
-/* =================== CONFIG =================== */
 const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
 let KI_AKTIV=false;
 
-/* =================== AKTIEN =================== */
 const STOCKS=[
 ["AAPL","Apple Inc."],["MSFT","Microsoft Corp."],["NVDA","NVIDIA Corp."],
 ["TSLA","Tesla Inc."],["AMZN","Amazon.com Inc."],["GOOGL","Alphabet Inc."],
@@ -95,17 +94,16 @@ STOCKS.forEach(s=>{
   stockSel.appendChild(o);
 });
 
-/* =================== KI TOGGLE =================== */
 function toggleKI(){
   KI_AKTIV=!KI_AKTIV;
-  document.getElementById("kiBtn").textContent="🧠 KI: "+(KI_AKTIV?"EIN":"AUS");
+  kiBtn.textContent="🧠 KI: "+(KI_AKTIV?"EIN":"AUS");
 }
 
-/* =================== CHART =================== */
+/* ===== Chart ===== */
 let chart;
 function draw(prices,forecast){
   if(chart) chart.destroy();
-  chart=new Chart(document.getElementById("chart"),{
+  chart=new Chart(chartCanvas,{
     type:"line",
     data:{
       labels:[...prices.map((_,i)=>"T"+(i+1)),...forecast.map((_,i)=>"F"+(i+1))],
@@ -117,87 +115,98 @@ function draw(prices,forecast){
   });
 }
 
-/* =================== DATEN =================== */
+/* ===== Daten ===== */
 async function fetchPrices(symbol,days){
   const now=Math.floor(Date.now()/1000);
-  const from=now-days*86400;
-  const r=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`);
-  const d=await r.json();
-  if(d.s==="ok"){
-    localStorage.setItem("CACHE_"+symbol,JSON.stringify(d.c));
-    return d.c;
-  }
+  const from=now-180*86400;
+  try{
+    const r=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`);
+    const d=await r.json();
+    if(d.s==="ok" && d.c.length>20){
+      localStorage.setItem("CACHE_"+symbol,JSON.stringify(d.c));
+      return d.c.slice(-days);
+    }
+  }catch{}
   const c=localStorage.getItem("CACHE_"+symbol);
-  if(c) return JSON.parse(c);
+  if(c) return JSON.parse(c).slice(-days);
   throw "Keine Marktdaten";
 }
 
-/* =================== PROGNOSE =================== */
-function forecastPrices(prices,n){
-  const last=prices.at(-1),prev=prices.at(-2)||last;
-  let trend=last-prev;
-  if(KI_AKTIV) trend*=1.4;
-  return Array.from({length:n},(_,i)=>last+trend*(i+1));
-}
-
-/* =================== NEWS =================== */
+/* ===== News + Score ===== */
 async function loadNews(symbol){
   try{
     const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=2024-01-01&to=2026-12-31&token=${API_KEY}`);
     const d=await r.json();
-    if(!d.length) return "Keine aktuellen News";
+    if(!d.length) return {html:"Keine News",score:0};
 
-    const n=d[0];
-    let impact="newsneu",text="Neutral";
-    if(n.headline.match(/beat|record|growth|surge/i)){impact="newspos";text="Positiv";}
-    if(n.headline.match(/loss|fall|lawsuit|drop/i)){impact="newsneg";text="Negativ";}
+    const h=d[0].headline;
+    let score=0,cls="neu",txt="Neutral";
+    if(/growth|beat|record|surge/i.test(h)){score=3;cls="pos";txt="Positiv";}
+    if(/loss|drop|lawsuit|fall/i.test(h)){score=-3;cls="neg";txt="Negativ";}
 
-    return `<span class="${impact}"><b>${text}</b></span><br>${n.headline}`;
+    return {
+      score,
+      html:`<span class="${cls}"><b>${txt} (${score})</b></span><br>${h}`
+    };
   }catch{
-    return "News nicht verfügbar";
+    return {html:"News nicht verfügbar",score:0};
   }
 }
 
-/* =================== ANALYSE =================== */
+/* ===== Analyse ===== */
 async function analyze(){
-  const status=document.getElementById("status");
   status.textContent="Analyse läuft…";
-
   try{
     const symbol=stockSel.value;
-    const days=parseInt(document.getElementById("days").value);
+    const days=parseInt(daysSel.value);
     const pricesUSD=await fetchPrices(symbol,days);
     const prices=pricesUSD.map(p=>p*0.93);
 
-    const forecast=forecastPrices(prices,7);
+    const last=prices.at(-1);
+    const prev=prices.at(-2)||last;
+    let trend=last-prev;
+    if(KI_AKTIV) trend*=1.3;
+
+    const news=await loadNews(symbol);
+    trend+=trend*(news.score/20);
+
+    const forecast=Array.from({length:7},(_,i)=>last+trend*(i+1));
     draw(prices,forecast);
 
-    const last=prices.at(-1);
-    const pred=forecast.at(-1);
-    const diff=(pred-last)/last;
-
+    const diff=(forecast.at(-1)-last)/last;
     const signal=diff>0.06?"KAUFEN":diff<-0.06?"VERKAUFEN":"HALTEN";
     const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
-    const stab=Math.abs(diff)<0.05?"Stabil":"Volatil";
 
-    document.getElementById("result").innerHTML=`
+    const volatility=Math.abs(trend/last);
+    const stability=Math.max(0,100-Math.round(volatility*800));
+    const confidence=stability>75?"Hoch":stability>45?"Mittel":"Niedrig";
+
+    result.innerHTML=`
     <tr>
       <td>${last.toFixed(2)}</td>
-      <td>${pred.toFixed(2)}</td>
+      <td>${forecast.at(-1).toFixed(2)}</td>
       <td class="${cls}">${signal}</td>
-      <td>${stab}</td>
+      <td>${stability}/100</td>
+      <td>${confidence}</td>
     </tr>`;
 
-    document.getElementById("news").innerHTML=await loadNews(symbol);
+    newsDiv.innerHTML=news.html;
     status.textContent="Analyse abgeschlossen";
   }catch(e){
-    status.textContent="Fehler: "+e;
+    status.textContent="Analyse möglich, aber eingeschränkt";
   }
 }
 
 function openYahoo(){
   window.open("https://finance.yahoo.com/quote/"+stockSel.value,"_blank");
 }
+
+/* Shortcuts */
+const chartCanvas=document.getElementById("chart");
+const result=document.getElementById("result");
+const status=document.getElementById("status");
+const newsDiv=document.getElementById("news");
+const daysSel=document.getElementById("days");
 </script>
 
 </body>
