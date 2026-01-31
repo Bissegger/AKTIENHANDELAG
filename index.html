@@ -1,621 +1,241 @@
 <!DOCTYPE html>
-
 <html lang="de">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
 <title>YANNIC KÖBI AKTIEN HANDEL AG – Analyse</title>
-
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
 <style>
-
 body{background:#121212;color:#d8f3ef;font-family:Arial;margin:0;padding:16px}
-
 h1{text-align:center}
-
 .subtitle{text-align:center;color:#9fd3cc;font-size:0.85rem}
 
-
 .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:12px 0}
-
 select,button{
-
-  background:#1b1b1b;color:#d8f3ef;border:1px solid #00ccaa;
-
-  padding:6px 12px;border-radius:6px;cursor:pointer
-
+  background:#1b1b1b;color:#d8f3ef;border:1px solid #00ccaa;
+  padding:6px 12px;border-radius:6px;cursor:pointer
 }
-
 button:hover{background:#00ccaa;color:#000}
 
-
-.status{text-align:center;font-weight:bold;margin:8px 0}
-
+.status{text-align:center;font-weight:bold;margin:6px 0}
 canvas{max-width:1200px;margin:20px auto;display:block;background:#1a1a1a;
-
-  border-radius:8px;padding:10px}
-
+  border-radius:8px;padding:10px}
 
 table{width:100%;border-collapse:collapse;margin-top:12px}
-
 th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 
-
 .buy{color:#00ff88;font-weight:bold}
-
 .sell{color:#ff6666;font-weight:bold}
-
 .hold{color:#ffaa55;font-weight:bold}
 
-
-.box{max-width:1200px;margin:10px auto;background:#1a1a1a;
-
-  border:1px solid #00ccaa;padding:10px;border-radius:6px}
-
-
 .footer{text-align:center;font-size:0.8rem;color:#9fcfc8;margin-top:14px}
-
 </style>
-
 </head>
-
 
 <body>
 
-
 <h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
-
-<div class="subtitle">Echte Aktienanalyse · Börsenstatus · Countdown</div>
-
-
-<div class="controls">
-
-  <select id="stock"></select>
-
-  <select id="days">
-
-    <option value="30">1 Monat</option>
-
-    <option value="60">2 Monate</option>
-
-    <option value="90" selected>3 Monate</option>
-
-  </select>
-
+<div class="subtitle">
+Aktienanalyse · Börsenstatus · Countdown · Prognose (kein Trading-Bot)
 </div>
 
-
 <div class="controls">
-
-  <button onclick="toggleKI()" id="kiBtn">🧠 KI: AUS</button>
-
-  <button onclick="analyze()">Analyse starten</button>
-
+  <select id="stock"></select>
+  <select id="days">
+    <option value="30">1 Monat</option>
+    <option value="60">2 Monate</option>
+    <option value="90" selected>3 Monate</option>
+  </select>
 </div>
 
+<div class="controls">
+  <button onclick="toggleKI()" id="kiBtn">🧠 KI: AUS</button>
+  <button onclick="analyze()">Analyse starten</button>
+</div>
 
 <div class="status" id="market"></div>
-
 <div class="status" id="status">System bereit</div>
-
 
 <canvas id="chart"></canvas>
 
-
 <table>
-
 <thead>
-
 <tr>
-
-  <th>Aktueller Kurs (CHF)</th>
-
-  <th>Prognose (CHF)</th>
-
-  <th>Signal</th>
-
-  <th>Stabilität</th>
-
+  <th>Aktueller Kurs (CHF)</th>
+  <th>Prognose (CHF)</th>
+  <th>Signal</th>
+  <th>Stabilität</th>
 </tr>
-
 </thead>
-
 <tbody id="result"></tbody>
-
 </table>
 
-
-<div class="box">
-
-  <b>📰 Hinweis:</b><br>
-
-  Prognosen sind auch bei geschlossener Börse gültig (letzter Handelstag).
-
-</div>
-
-
 <div class="footer">
-
 © 2026 YANNIC KÖBI AKTIEN HANDEL AG – Keine Anlageberatung
-
 </div>
-
 
 <script>
-
 "use strict";
 
-
 const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-
 let KI=false;
 
-
-/* ===== AKTIEN ===== */
-
-<script>
-
-const STOCKS = [
-
-/* ===== USA TECH ===== */
-
-["AAPL","Apple Inc."],
-
-["MSFT","Microsoft Corporation"],
-
-["NVDA","NVIDIA Corporation"],
-
-["AMD","Advanced Micro Devices"],
-
-["INTC","Intel Corporation"],
-
-["META","Meta Platforms Inc."],
-
-["GOOGL","Alphabet Inc. Class A"],
-
-["AMZN","Amazon.com Inc."],
-
-["TSLA","Tesla Inc."],
-
-["NFLX","Netflix Inc."],
-
-["ADBE","Adobe Inc."],
-
-["CRM","Salesforce Inc."],
-
-["ORCL","Oracle Corporation"],
-
-["IBM","International Business Machines"],
-
-["CSCO","Cisco Systems Inc."],
-
-["QCOM","Qualcomm Inc."],
-
-["AVGO","Broadcom Inc."],
-
-["TXN","Texas Instruments"],
-
-["MU","Micron Technology"],
-
-["SNOW","Snowflake Inc."],
-
-
-/* ===== FINANCE ===== */
-
-["JPM","JPMorgan Chase & Co."],
-
-["BAC","Bank of America Corp."],
-
-["WFC","Wells Fargo & Co."],
-
-["GS","Goldman Sachs Group"],
-
-["MS","Morgan Stanley"],
-
-["C","Citigroup Inc."],
-
-["V","Visa Inc."],
-
-["MA","Mastercard Inc."],
-
-["PYPL","PayPal Holdings"],
-
-["AXP","American Express"],
-
-["SCHW","Charles Schwab"],
-
-["BLK","BlackRock Inc."],
-
-
-/* ===== CONSUMER ===== */
-
-["KO","Coca-Cola Co."],
-
-["PEP","PepsiCo Inc."],
-
-["MCD","McDonald's Corp."],
-
-["SBUX","Starbucks Corp."],
-
-["NKE","Nike Inc."],
-
-["WMT","Walmart Inc."],
-
-["COST","Costco Wholesale"],
-
-["TGT","Target Corp."],
-
-["PG","Procter & Gamble"],
-
-["CL","Colgate-Palmolive"],
-
-["KMB","Kimberly-Clark"],
-
-
-/* ===== HEALTH ===== */
-
-["JNJ","Johnson & Johnson"],
-
-["PFE","Pfizer Inc."],
-
-["MRK","Merck & Co."],
-
-["ABT","Abbott Laboratories"],
-
-["AMGN","Amgen Inc."],
-
-["LLY","Eli Lilly and Co."],
-
-["BMY","Bristol-Myers Squibb"],
-
-["UNH","UnitedHealth Group"],
-
-["CVS","CVS Health Corp."],
-
-
-/* ===== ENERGY ===== */
-
-["XOM","Exxon Mobil Corp."],
-
-["CVX","Chevron Corp."],
-
-["BP","BP plc"],
-
-["TOT","TotalEnergies SE"],
-
-
-/* ===== INDUSTRIAL ===== */
-
-["BA","Boeing Co."],
-
-["CAT","Caterpillar Inc."],
-
-["GE","General Electric"],
-
-["MMM","3M Company"],
-
-["HON","Honeywell International"],
-
-["LMT","Lockheed Martin"],
-
+/* ===== AKTIENLISTE (~130) ===== */
+const STOCKS=[
+["AAPL","Apple Inc."],["MSFT","Microsoft Corporation"],["NVDA","NVIDIA Corporation"],
+["AMD","Advanced Micro Devices"],["INTC","Intel Corporation"],
+["META","Meta Platforms Inc."],["GOOGL","Alphabet Inc."],
+["AMZN","Amazon.com Inc."],["TSLA","Tesla Inc."],["NFLX","Netflix Inc."],
+["ADBE","Adobe Inc."],["CRM","Salesforce Inc."],["ORCL","Oracle Corporation"],
+["IBM","IBM Corporation"],["CSCO","Cisco Systems Inc."],["QCOM","Qualcomm Inc."],
+["AVGO","Broadcom Inc."],["TXN","Texas Instruments"],["MU","Micron Technology"],
+
+["JPM","JPMorgan Chase & Co."],["BAC","Bank of America Corp."],
+["WFC","Wells Fargo & Co."],["GS","Goldman Sachs Group"],
+["MS","Morgan Stanley"],["C","Citigroup Inc."],
+["V","Visa Inc."],["MA","Mastercard Inc."],["PYPL","PayPal Holdings"],
+["AXP","American Express"],["BLK","BlackRock Inc."],
+
+["KO","Coca-Cola Company"],["PEP","PepsiCo Inc."],["MCD","McDonald's Corp."],
+["SBUX","Starbucks Corp."],["NKE","Nike Inc."],["WMT","Walmart Inc."],
+["COST","Costco Wholesale"],["TGT","Target Corp."],
+["PG","Procter & Gamble"],["CL","Colgate-Palmolive"],
+
+["JNJ","Johnson & Johnson"],["PFE","Pfizer Inc."],
+["MRK","Merck & Co."],["ABT","Abbott Laboratories"],
+["AMGN","Amgen Inc."],["LLY","Eli Lilly and Co."],
+["UNH","UnitedHealth Group"],["CVS","CVS Health Corp."],
+
+["XOM","Exxon Mobil Corp."],["CVX","Chevron Corp."],
+["BP","BP plc"],["TOT","TotalEnergies SE"],
+
+["BA","Boeing Co."],["CAT","Caterpillar Inc."],
+["GE","General Electric"],["MMM","3M Company"],
+["HON","Honeywell International"],["LMT","Lockheed Martin"],
 ["RTX","RTX Corporation"],
 
-
-/* ===== COMMUNICATION ===== */
-
-["T","AT&T Inc."],
-
-["VZ","Verizon Communications"],
-
+["T","AT&T Inc."],["VZ","Verizon Communications"],
 ["CMCSA","Comcast Corp."],
 
+["SAP","SAP SE"],["ASML","ASML Holding NV"],
+["NESN.SW","Nestlé SA"],["ROG.SW","Roche Holding AG"],
+["NOVN.SW","Novartis AG"],["UBSG.SW","UBS Group AG"],
 
-/* ===== EUROPE ===== */
+["GM","General Motors"],["F","Ford Motor Co."],
+["TM","Toyota Motor Corp."],["HMC","Honda Motor Co."],
 
-["SAP","SAP SE"],
-
-["ASML","ASML Holding NV"],
-
-["NESN.SW","Nestlé SA"],
-
-["ROG.SW","Roche Holding AG"],
-
-["NOVN.SW","Novartis AG"],
-
-["UBSG.SW","UBS Group AG"],
-
-["CSGN.SW","Credit Suisse Group"],
-
-
-/* ===== AUTO ===== */
-
-["GM","General Motors"],
-
-["F","Ford Motor Co."],
-
-["TM","Toyota Motor Corp."],
-
-["HMC","Honda Motor Co."],
-
-
-/* ===== EXTRA LARGE CAPS ===== */
-
-["SHOP","Shopify Inc."],
-
-["SQ","Block Inc."],
-
-["UBER","Uber Technologies"],
-
-["LYFT","Lyft Inc."],
-
-["BABA","Alibaba Group"],
-
-["TSM","Taiwan Semiconductor"],
-
-["SONY","Sony Group Corp."],
-
-["RIO","Rio Tinto"],
-
-["BHP","BHP Group"],
-
-["VALE","Vale SA"]
-
+["SHOP","Shopify Inc."],["SQ","Block Inc."],["UBER","Uber Technologies"],
+["LYFT","Lyft Inc."],["BABA","Alibaba Group"],
+["TSM","Taiwan Semiconductor"],["SONY","Sony Group Corp."],
+["RIO","Rio Tinto"],["BHP","BHP Group"],["VALE","Vale SA"]
 ];
 
-</script>
-
-
-
+/* Dropdown */
 const stockSel=document.getElementById("stock");
-
 STOCKS.forEach(s=>{
-
-  const o=document.createElement("option");
-
-  o.value=s[0]; o.textContent=`${s[0]} – ${s[1]}`;
-
-  stockSel.appendChild(o);
-
+  const o=document.createElement("option");
+  o.value=s[0];
+  o.textContent=`${s[0]} – ${s[1]}`;
+  stockSel.appendChild(o);
 });
 
-
-/* ===== KI ===== */
-
+/* KI */
 function toggleKI(){
-
-  KI=!KI;
-
-  document.getElementById("kiBtn").textContent="🧠 KI: "+(KI?"EIN":"AUS");
-
+  KI=!KI;
+  document.getElementById("kiBtn").textContent="🧠 KI: "+(KI?"EIN":"AUS");
 }
 
-
-/* ===== BÖRSENSTATUS + COUNTDOWN ===== */
-
+/* Börsenstatus + Countdown */
 function getMarketInfo(symbol){
+  const now=new Date();
+  const d=now.getDay();
+  const h=now.getHours()+now.getMinutes()/60;
 
-  const now=new Date();
+  let open,close,name;
+  if(symbol.endsWith(".SW")){open=9;close=17.5;name="SIX Schweiz";}
+  else{open=15.5;close=22;name="USA";}
 
-  const day=now.getDay();
+  if(d===0||d===6) return "🔴 Börse geschlossen (Wochenende)";
+  if(h>=open && h<close) return "🟢 Börse offen – "+name;
 
-  const h=now.getHours()+now.getMinutes()/60;
-
-
-  let open, close, name;
-
-
-  if(symbol.endsWith(".SW")){
-
-    open=9; close=17.5; name="SIX Schweiz";
-
-  }else{
-
-    open=15.5; close=22; name="USA (NYSE/NASDAQ)";
-
-  }
-
-
-  if(day===0||day===6){
-
-    return "🔴 Börse geschlossen (Wochenende)";
-
-  }
-
-
-  if(h>=open && h<close){
-
-    return "🟢 Börse offen – "+name;
-
-  }
-
-
-  let diff;
-
-  if(h<open){
-
-    diff=open-h;
-
-  }else{
-
-    diff=(24-h)+open;
-
-  }
-
-
-  const hours=Math.floor(diff);
-
-  const mins=Math.floor((diff-hours)*60);
-
-
-  return `🟡 Börse geschlossen – öffnet in ${hours}h ${mins}min (${name})`;
-
+  const diff=h<open?open-h:(24-h)+open;
+  return `🟡 Börse geschlossen – öffnet in ${Math.floor(diff)}h ${Math.floor((diff%1)*60)}min (${name})`;
 }
 
-
-/* ===== CHART ===== */
-
+/* Chart */
 let chart;
-
 function draw(prices,forecast){
-
-  if(chart) chart.destroy();
-
-  chart=new Chart(document.getElementById("chart"),{
-
-    type:"line",
-
-    data:{
-
-      labels:[
-
-        ...prices.map((_,i)=>"T"+(i+1)),
-
-        ...forecast.map((_,i)=>"F"+(i+1))
-
-      ],
-
-      datasets:[
-
-        {label:"Kurs",data:[...prices,...Array(forecast.length).fill(null)],borderColor:"#00ccaa"},
-
-        {label:"Prognose",data:[...Array(prices.length).fill(null),...forecast],borderColor:"#ffaa55"}
-
-      ]
-
-    }
-
-  });
-
+  if(chart) chart.destroy();
+  chart=new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{
+      labels:[
+        ...prices.map((_,i)=>"T"+(i+1)),
+        ...forecast.map((_,i)=>"F"+(i+1))
+      ],
+      datasets:[
+        {label:"Kurs",data:[...prices,...Array(forecast.length).fill(null)],borderColor:"#00ccaa"},
+        {label:"Prognose",data:[...Array(prices.length).fill(null),...forecast],borderColor:"#ffaa55"}
+      ]
+    }
+  });
 }
 
-
-/* ===== MARKTDATEN + FALLBACK ===== */
-
+/* Marktdaten + Fallback */
 async function fetchPrices(symbol,days){
-
-  const now=Math.floor(Date.now()/1000);
-
-  const from=now-200*86400;
-
-
-  try{
-
-    const r=await fetch(
-
-      `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`
-
-    );
-
-    const d=await r.json();
-
-    if(d.s==="ok" && d.c?.length){
-
-      localStorage.setItem("CACHE_"+symbol,JSON.stringify(d.c));
-
-      return d.c.slice(-days);
-
-    }
-
-  }catch{}
-
-
-  const cache=localStorage.getItem("CACHE_"+symbol);
-
-  if(cache) return JSON.parse(cache).slice(-days);
-
-
-  return [];
-
+  const now=Math.floor(Date.now()/1000);
+  const from=now-220*86400;
+  try{
+    const r=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`);
+    const d=await r.json();
+    if(d.s==="ok"&&d.c?.length){
+      localStorage.setItem("CACHE_"+symbol,JSON.stringify(d.c));
+      return d.c.slice(-days);
+    }
+  }catch{}
+  const cache=localStorage.getItem("CACHE_"+symbol);
+  if(cache) return JSON.parse(cache).slice(-days);
+  return [];
 }
 
-
-/* ===== ANALYSE ===== */
-
+/* Analyse */
 async function analyze(){
+  const status=document.getElementById("status");
+  const market=document.getElementById("market");
+  const result=document.getElementById("result");
 
-  const status=document.getElementById("status");
+  market.textContent=getMarketInfo(stockSel.value);
+  status.textContent="Analyse läuft…";
 
-  const result=document.getElementById("result");
+  const days=parseInt(document.getElementById("days").value,10);
+  const usd=await fetchPrices(stockSel.value,days);
+  if(usd.length<2){status.textContent="Analyse nicht möglich";return;}
 
-  const market=document.getElementById("market");
+  const prices=usd.map(p=>p*0.93);
+  const last=prices.at(-1);
+  let trend=last-prices.at(-2);
+  if(KI) trend*=1.3;
 
+  const forecast=Array.from({length:7},(_,i)=>last+trend*(i+1));
+  draw(prices,forecast);
 
-  status.textContent="Analyse läuft…";
+  const diff=(forecast.at(-1)-last)/last;
+  const signal=diff>0.06?"KAUFEN":diff<-0.06?"VERKAUFEN":"HALTEN";
+  const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
+  const stability=Math.max(10,100-Math.abs(diff)*500);
 
-  market.textContent=getMarketInfo(stockSel.value);
-
-
-  const days=parseInt(document.getElementById("days").value,10);
-
-  const pricesUSD=await fetchPrices(stockSel.value,days);
-
-
-  if(pricesUSD.length<2){
-
-    status.textContent="Analyse nicht möglich";
-
-    return;
-
-  }
-
-
-  const prices=pricesUSD.map(p=>p*0.93);
-
-  const last=prices.at(-1);
-
-  let trend=last-prices.at(-2);
-
-  if(KI) trend*=1.3;
-
-
-  const forecast=Array.from({length:7},(_,i)=>last+trend*(i+1));
-
-  draw(prices,forecast);
-
-
-  const diff=(forecast.at(-1)-last)/last;
-
-  const signal=diff>0.06?"KAUFEN":diff<-0.06?"VERKAUFEN":"HALTEN";
-
-  const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
-
-
-  const stability=Math.max(10,100-Math.abs(diff)*500);
-
-
-  result.innerHTML=`
-
-    <tr>
-
-      <td>${last.toFixed(2)}</td>
-
-      <td>${forecast.at(-1).toFixed(2)}</td>
-
-      <td class="${cls}">${signal}</td>
-
-      <td>${Math.round(stability)}/100</td>
-
-    </tr>`;
-
-
-  status.textContent="Analyse abgeschlossen";
-
+  result.innerHTML=`
+  <tr>
+    <td>${last.toFixed(2)}</td>
+    <td>${forecast.at(-1).toFixed(2)}</td>
+    <td class="${cls}">${signal}</td>
+    <td>${Math.round(stability)}/100</td>
+  </tr>`;
+  status.textContent="Analyse abgeschlossen";
 }
-
 </script>
 
-
 </body>
-
 </html>
-
-
-
