@@ -2,115 +2,57 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – Mobile KI Analyse</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YANNIC KÖBI AKTIEN HANDEL AG – KI Analyse</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-:root{
-  --bg:#121212;
-  --card:#1a1a1a;
-  --accent:#00ccaa;
-  --text:#d8f3ef;
-}
-
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:Arial,Helvetica,sans-serif;
-  margin:0;
-  padding:12px;
+  background:#121212;color:#d8f3ef;font-family:Arial;margin:0;padding:14px
 }
+h1{text-align:center;font-size:1.4rem;margin:6px 0}
+.subtitle{text-align:center;font-size:.85rem;color:#9fd3cc}
 
-h1{
-  text-align:center;
-  font-size:1.3rem;
-  margin:6px 0;
-}
-
-.subtitle{
-  text-align:center;
-  font-size:.8rem;
-  color:#9fd3cc;
-  margin-bottom:10px;
-}
-
-.controls{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  margin:10px 0;
-}
-
+.controls{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 select,button{
-  width:100%;
-  padding:10px;
-  font-size:1rem;
-  background:#1b1b1b;
-  color:var(--text);
-  border:1px solid var(--accent);
-  border-radius:8px;
+  padding:10px;font-size:1rem;
+  background:#1b1b1b;color:#d8f3ef;
+  border:1px solid #00ccaa;border-radius:8px
 }
+button:disabled{opacity:.6}
 
-button{
-  font-weight:bold;
+.status{text-align:center;font-weight:bold;margin:6px 0;font-size:.9rem}
+
+.progress-box{
+  width:100%;background:#1a1a1a;border-radius:8px;
+  overflow:hidden;margin:8px 0;display:none
 }
-
-button:active{
-  background:var(--accent);
-  color:#000;
-}
-
-.status{
-  text-align:center;
-  font-size:.85rem;
-  margin:4px 0;
+.progress-bar{
+  height:10px;width:0%;background:#00ccaa;transition:width .3s
 }
 
 canvas{
-  width:100%!important;
-  height:260px!important;
-  background:var(--card);
-  border-radius:10px;
-  padding:6px;
+  width:100%!important;height:260px!important;
+  background:#1a1a1a;border-radius:10px;padding:6px
 }
 
-.table-wrap{
-  overflow-x:auto;
-  margin-top:10px;
-}
-
-table{
-  width:100%;
-  min-width:520px;
-  border-collapse:collapse;
-}
-
-th,td{
-  border:1px solid var(--accent);
-  padding:6px;
-  text-align:center;
-  font-size:.85rem;
-}
+.table-wrap{overflow-x:auto}
+table{width:100%;min-width:520px;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 
 .buy{color:#00ff88;font-weight:bold}
 .sell{color:#ff6666;font-weight:bold}
 .hold{color:#ffaa55;font-weight:bold}
 
-.footer{
-  text-align:center;
-  font-size:.75rem;
-  color:#9fcfc8;
-  margin-top:12px;
-}
+.footer{text-align:center;font-size:.75rem;color:#9fcfc8;margin-top:14px}
 </style>
 </head>
 
 <body>
 
 <h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
-<div class="subtitle">Mobile KI-Analyse · Echtzeitdaten · Stabil</div>
+<div class="subtitle">KI-Analyse · Fortschrittsanzeige · Stabil</div>
 
 <div class="controls">
   <select id="stock"></select>
@@ -121,6 +63,10 @@ th,td{
   </select>
   <button id="kiBtn">🧠 KI: EIN</button>
   <button id="analyzeBtn">📊 Analyse starten</button>
+</div>
+
+<div class="progress-box" id="progressBox">
+  <div class="progress-bar" id="progressBar"></div>
 </div>
 
 <div class="status" id="market"></div>
@@ -148,11 +94,11 @@ th,td{
 <script>
 "use strict";
 
-/* ===== BASIS ===== */
+/* ================= BASIS ================= */
 const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-let KI=true, chart=null;
+let KI=true, chart=null, isAnalyzing=false;
 
-/* ===== AKTIEN ===== */
+/* ================= AKTIEN ================= */
 const STOCKS=[
 ["AAPL","Apple Inc."],["MSFT","Microsoft"],["NVDA","NVIDIA"],
 ["AMZN","Amazon"],["TSLA","Tesla"],["GOOGL","Alphabet"],
@@ -168,25 +114,36 @@ STOCKS.forEach(s=>{
   stockSel.appendChild(o);
 });
 
-/* ===== BUTTONS ===== */
+/* ================= BUTTONS ================= */
 kiBtn.onclick=()=>{
   KI=!KI;
   kiBtn.textContent="🧠 KI: "+(KI?"EIN":"AUS");
 };
 
-analyzeBtn.onclick=()=>analyze();
+analyzeBtn.onclick=()=>{
+  if(!isAnalyzing) analyze();
+};
 
-/* ===== MARKET STATUS ===== */
+/* ================= UI HILFE ================= */
+function setProgress(p){
+  progressBox.style.display="block";
+  progressBar.style.width=p+"%";
+}
+function resetProgress(){
+  progressBar.style.width="0%";
+  progressBox.style.display="none";
+}
+
+/* ================= MARKTSTATUS ================= */
 function updateMarket(){
-  const now=new Date();
-  const d=now.getDay();
+  const d=new Date().getDay();
   market.textContent=
     (d===0||d===6)
     ?"🔴 Börse geschlossen (Wochenende)"
     :"🟢 Marktstatus geprüft";
 }
 
-/* ===== DATA ===== */
+/* ================= DATEN ================= */
 async function fetchOHLC(symbol){
   const now=Math.floor(Date.now()/1000);
   const from=now-300*86400;
@@ -204,7 +161,7 @@ async function fetchOHLC(symbol){
   return cache?JSON.parse(cache):null;
 }
 
-/* ===== PATTERN ===== */
+/* ================= PATTERN ================= */
 function pattern(d){
   const i=d.c.length-1;
   let score=0,p=[];
@@ -217,7 +174,7 @@ function pattern(d){
   return {score,p};
 }
 
-/* ===== CHART ===== */
+/* ================= CHART ================= */
 function draw(prices,forecast){
   if(chart) chart.destroy();
   chart=new Chart(chartEl,{
@@ -233,40 +190,64 @@ function draw(prices,forecast){
   });
 }
 
-/* ===== ANALYSE ===== */
+/* ================= ANALYSE MIT FORTSCHRITT ================= */
 async function analyze(){
-  status.textContent="Analyse läuft…";
-  updateMarket();
+  isAnalyzing=true;
+  analyzeBtn.disabled=true;
+  setProgress(5);
+  status.textContent="Analyse gestartet…";
 
-  const d=await fetchOHLC(stockSel.value);
-  if(!d){status.textContent="Keine Marktdaten";return;}
+  try{
+    updateMarket();
+    setProgress(15);
+    status.textContent="Marktdaten werden geladen…";
 
-  const prices=d.c.slice(-30).map(p=>p*0.93);
-  const last=prices.at(-1);
-  const r=pattern(d);
+    const d=await fetchOHLC(stockSel.value);
+    if(!d){status.textContent="Keine Marktdaten";return;}
 
-  let factor=0.002;
-  if(r.score>2) factor=0.008;
-  if(r.score<0) factor=-0.006;
-  if(!KI) factor=0;
+    setProgress(40);
+    status.textContent="KI analysiert Pattern…";
 
-  const forecast=[1,2,3,4,5].map(i=>last*(1+factor*i));
-  draw(prices,forecast);
+    const prices=d.c.slice(-30).map(p=>p*0.93);
+    const last=prices.at(-1);
+    const r=pattern(d);
 
-  const diff=(forecast.at(-1)-last)/last;
-  const signal=diff>0.05?"KAUFEN":diff<-0.05?"VERKAUFEN":"HALTEN";
-  const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
+    setProgress(65);
+    status.textContent="Prognose wird berechnet…";
 
-  result.innerHTML=`
-  <tr>
-    <td>${last.toFixed(2)}</td>
-    <td>${forecast.at(-1).toFixed(2)}</td>
-    <td class="${cls}">${signal}</td>
-    <td>${Math.max(20,100-Math.abs(diff)*600).toFixed(0)}/100</td>
-    <td>${r.p.join(", ")}</td>
-  </tr>`;
+    let factor=0.002;
+    if(r.score>2) factor=0.008;
+    if(r.score<0) factor=-0.006;
+    if(!KI) factor=0;
 
-  status.textContent="Analyse abgeschlossen";
+    const forecast=[1,2,3,4,5].map(i=>last*(1+factor*i));
+
+    setProgress(85);
+    draw(prices,forecast);
+
+    const diff=(forecast.at(-1)-last)/last;
+    const signal=diff>0.05?"KAUFEN":diff<-0.05?"VERKAUFEN":"HALTEN";
+    const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
+
+    result.innerHTML=`
+      <tr>
+        <td>${last.toFixed(2)}</td>
+        <td>${forecast.at(-1).toFixed(2)}</td>
+        <td class="${cls}">${signal}</td>
+        <td>${Math.max(20,100-Math.abs(diff)*600).toFixed(0)}/100</td>
+        <td>${r.p.join(", ")}</td>
+      </tr>`;
+
+    setProgress(100);
+    status.textContent="✅ Analyse abgeschlossen";
+
+  }catch(e){
+    status.textContent="❌ Analysefehler";
+  }finally{
+    setTimeout(resetProgress,800);
+    analyzeBtn.disabled=false;
+    isAnalyzing=false;
+  }
 }
 
 updateMarket();
