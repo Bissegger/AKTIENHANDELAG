@@ -3,22 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – KI Analyse</title>
+<title>AKTIEN KI ANALYSE</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{
-  background:#121212;color:#d8f3ef;font-family:Arial;margin:0;padding:14px
-}
+body{background:#121212;color:#e0f7f4;font-family:Arial;margin:0;padding:14px}
 h1{text-align:center;font-size:1.4rem;margin:6px 0}
 .subtitle{text-align:center;font-size:.85rem;color:#9fd3cc}
 
 .controls{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 select,button{
-  padding:10px;font-size:1rem;
-  background:#1b1b1b;color:#d8f3ef;
-  border:1px solid #00ccaa;border-radius:8px
+  padding:10px;font-size:1rem;border-radius:8px;
+  background:#1b1b1b;color:#e0f7f4;
+  border:1px solid #00ccaa
 }
 button:disabled{opacity:.6}
 
@@ -29,7 +27,8 @@ button:disabled{opacity:.6}
   overflow:hidden;margin:8px 0;display:none
 }
 .progress-bar{
-  height:10px;width:0%;background:#00ccaa;transition:width .3s
+  height:10px;width:0%;background:#00ccaa;
+  transition:width .25s
 }
 
 canvas{
@@ -51,16 +50,11 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 
 <body>
 
-<h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
-<div class="subtitle">KI-Analyse · Fortschrittsanzeige · Stabil</div>
+<h1>AKTIEN KI ANALYSE</h1>
+<div class="subtitle">Stabil · Kein Freeze · Mobile</div>
 
 <div class="controls">
   <select id="stock"></select>
-  <select id="days">
-    <option value="30">1 Monat</option>
-    <option value="60">2 Monate</option>
-    <option value="90" selected>3 Monate</option>
-  </select>
   <button id="kiBtn">🧠 KI: EIN</button>
   <button id="analyzeBtn">📊 Analyse starten</button>
 </div>
@@ -78,7 +72,7 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 <table>
 <thead>
 <tr>
-  <th>Kurs (CHF)</th>
+  <th>Kurs</th>
   <th>Prognose</th>
   <th>Signal</th>
   <th>Stabilität</th>
@@ -89,18 +83,18 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 </table>
 </div>
 
-<div class="footer">© 2026 – Keine Anlageberatung</div>
+<div class="footer">Keine Anlageberatung</div>
 
 <script>
 "use strict";
 
-/* ================= BASIS ================= */
+/* ================= KONFIG ================= */
 const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
 let KI=true, chart=null, isAnalyzing=false;
 
 /* ================= AKTIEN ================= */
 const STOCKS=[
-["AAPL","Apple Inc."],["MSFT","Microsoft"],["NVDA","NVIDIA"],
+["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],
 ["AMZN","Amazon"],["TSLA","Tesla"],["GOOGL","Alphabet"],
 ["META","Meta"],["NFLX","Netflix"],
 ["NESN.SW","Nestlé"],["ROG.SW","Roche"],["NOVN.SW","Novartis"]
@@ -124,7 +118,7 @@ analyzeBtn.onclick=()=>{
   if(!isAnalyzing) analyze();
 };
 
-/* ================= UI HILFE ================= */
+/* ================= UI ================= */
 function setProgress(p){
   progressBox.style.display="block";
   progressBar.style.width=p+"%";
@@ -137,10 +131,10 @@ function resetProgress(){
 /* ================= MARKTSTATUS ================= */
 function updateMarket(){
   const d=new Date().getDay();
-  market.textContent=
+  market.textContent =
     (d===0||d===6)
-    ?"🔴 Börse geschlossen (Wochenende)"
-    :"🟢 Marktstatus geprüft";
+    ?"🔴 Börse geschlossen – letzte Daten"
+    :"🟢 Börse geöffnet / letzte Kurse";
 }
 
 /* ================= DATEN ================= */
@@ -164,13 +158,13 @@ async function fetchOHLC(symbol){
 /* ================= PATTERN ================= */
 function pattern(d){
   const i=d.c.length-1;
+  if(i<1) return {score:0,p:["–"]};
   let score=0,p=[];
-  if(i<1) return {score,p:["–"]};
   const body=Math.abs(d.c[i]-d.o[i]);
   const range=d.h[i]-d.l[i];
   if(body<range*0.1){p.push("Doji");score++;}
-  if(d.c[i]>d.o[i]&&d.c[i-1]<d.o[i-1]){p.push("Bullish Engulfing");score+=3;}
-  if(d.o[i]>d.c[i]&&d.c[i-1]>d.o[i-1]){p.push("Bearish Engulfing");score-=3;}
+  if(d.c[i]>d.o[i]&&d.c[i-1]<d.o[i-1]){p.push("Bullish");score+=3;}
+  if(d.o[i]>d.c[i]&&d.c[i-1]>d.o[i-1]){p.push("Bearish");score-=3;}
   return {score,p};
 }
 
@@ -190,30 +184,42 @@ function draw(prices,forecast){
   });
 }
 
-/* ================= ANALYSE MIT FORTSCHRITT ================= */
+/* ================= FREEZE-SICHERE ANALYSE ================= */
 async function analyze(){
+  if(isAnalyzing) return;
   isAnalyzing=true;
   analyzeBtn.disabled=true;
-  setProgress(5);
-  status.textContent="Analyse gestartet…";
+
+  const idle=()=>new Promise(r=>setTimeout(r,0));
 
   try{
+    status.textContent="Analyse startet…";
+    setProgress(5);
+    await idle();
+
     updateMarket();
     setProgress(15);
-    status.textContent="Marktdaten werden geladen…";
+    status.textContent="Lade Marktdaten…";
+    await idle();
 
     const d=await fetchOHLC(stockSel.value);
-    if(!d){status.textContent="Keine Marktdaten";return;}
+    if(!d||!d.c||d.c.length===0){
+      status.textContent="❌ Keine Marktdaten verfügbar";
+      return;
+    }
 
     setProgress(40);
-    status.textContent="KI analysiert Pattern…";
+    status.textContent="Analysiere Kurse…";
+    await idle();
 
-    const prices=d.c.slice(-30).map(p=>p*0.93);
+    const prices=d.c.slice(-30);
     const last=prices.at(-1);
+
     const r=pattern(d);
 
     setProgress(65);
-    status.textContent="Prognose wird berechnet…";
+    status.textContent="Berechne Prognose…";
+    await idle();
 
     let factor=0.002;
     if(r.score>2) factor=0.008;
@@ -224,6 +230,7 @@ async function analyze(){
 
     setProgress(85);
     draw(prices,forecast);
+    await idle();
 
     const diff=(forecast.at(-1)-last)/last;
     const signal=diff>0.05?"KAUFEN":diff<-0.05?"VERKAUFEN":"HALTEN";
@@ -234,7 +241,7 @@ async function analyze(){
         <td>${last.toFixed(2)}</td>
         <td>${forecast.at(-1).toFixed(2)}</td>
         <td class="${cls}">${signal}</td>
-        <td>${Math.max(20,100-Math.abs(diff)*600).toFixed(0)}/100</td>
+        <td>${Math.max(25,100-Math.abs(diff)*600).toFixed(0)}/100</td>
         <td>${r.p.join(", ")}</td>
       </tr>`;
 
@@ -242,9 +249,10 @@ async function analyze(){
     status.textContent="✅ Analyse abgeschlossen";
 
   }catch(e){
-    status.textContent="❌ Analysefehler";
+    console.error(e);
+    status.textContent="❌ Analysefehler (abgefangen)";
   }finally{
-    setTimeout(resetProgress,800);
+    setTimeout(resetProgress,600);
     analyzeBtn.disabled=false;
     isAnalyzing=false;
   }
