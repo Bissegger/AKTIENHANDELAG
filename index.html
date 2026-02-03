@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YANNIC KÖBI AKTIEN HANDEL AG – Analyse</title>
+<title>AKTIEN HANDEL AG – Analyse</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -36,7 +36,7 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center}
 
 <body>
 
-<h1>YANNIC KÖBI AKTIEN HANDEL AG</h1>
+<h1>AKTIEN HANDEL AG</h1>
 <div class="subtitle">
 Aktienanalyse · Börsenstatus · Exakte Zeiten · Live-Countdown
 </div>
@@ -74,7 +74,7 @@ Aktienanalyse · Börsenstatus · Exakte Zeiten · Live-Countdown
 </table>
 
 <div class="footer">
-© 2026 YANNIC KÖBI AKTIEN HANDEL AG – Keine Anlageberatung
+© 2026 AKTIEN HANDEL AG – Keine Anlageberatung
 </div>
 
 <script>
@@ -108,7 +108,7 @@ function toggleKI(){
   document.getElementById("kiBtn").textContent="🧠 KI: "+(KI?"EIN":"AUS");
 }
 
-/* ===== HILFSFUNKTIONEN ===== */
+/* ===== DATUM FORMAT ===== */
 function formatDate(d){
   return d.toLocaleString("de-CH",{
     weekday:"short",
@@ -120,66 +120,52 @@ function formatDate(d){
   });
 }
 
-/* ===== BÖRSENSTATUS + EXAKTER COUNTDOWN ===== */
+/* ===== BÖRSENSTATUS + COUNTDOWN ===== */
 function updateMarketStatus(){
   const symbol=stockSel.value;
   const now=new Date();
   const day=now.getDay();
 
-  let openHour, closeHour, name;
-
+  let openH, closeH, name;
   if(symbol.endsWith(".SW")){
-    openHour=9; closeHour=17.5; name="SIX Schweiz";
+    openH=9; closeH=17.5; name="SIX Schweiz";
   }else{
-    openHour=15.5; closeHour=22; name="USA (NYSE/NASDAQ)";
+    openH=15.5; closeH=22; name="USA (NYSE/NASDAQ)";
   }
 
-  let openTime=new Date(now);
-  openTime.setHours(Math.floor(openHour),(openHour%1)*60,0,0);
+  let open=new Date(now);
+  open.setHours(Math.floor(openH),(openH%1)*60,0,0);
+  let close=new Date(now);
+  close.setHours(Math.floor(closeH),(closeH%1)*60,0,0);
 
-  let closeTime=new Date(now);
-  closeTime.setHours(Math.floor(closeHour),(closeHour%1)*60,0,0);
+  const market=document.getElementById("market");
+  const cd=document.getElementById("countdown");
 
-  // Wochenende
   if(day===0||day===6){
     const next=new Date(now);
     next.setDate(now.getDate()+(day===6?2:1));
-    next.setHours(Math.floor(openHour),(openHour%1)*60,0,0);
-
-    document.getElementById("market").textContent=
-      "🔴 Börse geschlossen (Wochenende) – "+name;
-    document.getElementById("countdown").textContent=
-      `🕒 Öffnet am ${formatDate(next)}`;
+    next.setHours(Math.floor(openH),(openH%1)*60,0,0);
+    market.textContent="🔴 Börse geschlossen (Wochenende) – "+name;
+    cd.textContent="🔓 Öffnet am "+formatDate(next);
     return;
   }
 
   let target;
-  if(now>=openTime && now<closeTime){
-    document.getElementById("market").textContent=
-      "🟢 Börse offen – "+name;
-    target=closeTime;
-    document.getElementById("countdown").textContent=
-      `🔒 Schließt um ${formatDate(closeTime)}`;
+  if(now>=open && now<close){
+    market.textContent="🟢 Börse offen – "+name;
+    target=close;
+    cd.textContent="🔒 Schließt um "+formatDate(close);
   }else{
-    document.getElementById("market").textContent=
-      "🟡 Börse geschlossen – "+name;
-    if(now<openTime){
-      target=openTime;
-    }else{
-      target=new Date(openTime);
-      target.setDate(target.getDate()+1);
-    }
-    document.getElementById("countdown").textContent=
-      `🔓 Öffnet um ${formatDate(target)}`;
+    market.textContent="🟡 Börse geschlossen – "+name;
+    target=now<open?open:new Date(open.setDate(open.getDate()+1));
+    cd.textContent="🔓 Öffnet um "+formatDate(target);
   }
 
   const diff=target-now;
   const h=Math.floor(diff/3.6e6);
   const m=Math.floor((diff%3.6e6)/6e4);
   const s=Math.floor((diff%6e4)/1000);
-
-  document.getElementById("countdown").textContent+=
-    ` ⏳ (${h}h ${m}m ${s}s)`;
+  cd.textContent+=` ⏳ (${h}h ${m}m ${s}s)`;
 }
 
 /* ===== MARKTDATEN + FALLBACK ===== */
@@ -220,7 +206,7 @@ function draw(prices,forecast){
   });
 }
 
-/* ===== ANALYSE ===== */
+/* ===== ANALYSE (BUGFIX) ===== */
 async function analyze(){
   document.getElementById("status").textContent="Analyse läuft…";
 
@@ -230,14 +216,21 @@ async function analyze(){
 
   const days=parseInt(document.getElementById("days").value,10);
   const usd=await fetchPrices(stockSel.value,days);
-  if(usd.length<2){
-    document.getElementById("status").textContent="Analyse eingeschränkt";
+
+  if(usd.length===0){
+    document.getElementById("status").textContent=
+      "Analyse nicht möglich – keine Marktdaten";
     return;
   }
 
   const prices=usd.map(p=>p*0.93);
   const last=prices.at(-1);
-  let trend=last-prices.at(-2);
+
+  /* WICHTIGER FIX */
+  let trend = prices.length>1
+    ? last-prices.at(-2)
+    : last*0.002; // minimaler Trend bei 1 Kurs
+
   if(KI) trend*=1.3;
 
   const forecast=Array.from({length:7},(_,i)=>last+trend*(i+1));
@@ -256,7 +249,10 @@ async function analyze(){
       <td>${Math.round(stability)}/100</td>
     </tr>`;
 
-  document.getElementById("status").textContent="Analyse abgeschlossen";
+  document.getElementById("status").textContent=
+    prices.length<2
+    ? "Analyse abgeschlossen (wenige Marktdaten – Prognose vorsichtig)"
+    : "Analyse abgeschlossen";
 }
 </script>
 
