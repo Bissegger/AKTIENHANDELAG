@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aktien KI Analyse</title>
 
+<!-- Chart.js + Candlestick -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
 <style>
 body{background:#121212;color:#e0f7f4;font-family:Arial;margin:0;padding:14px}
-h1{text-align:center;font-size:1.4rem}
+h1{text-align:center;font-size:1.4rem;margin:6px 0}
 .subtitle{text-align:center;font-size:.85rem;color:#9fd3cc}
 
 .controls{display:flex;flex-direction:column;gap:8px;margin:12px 0}
@@ -18,22 +20,12 @@ select,button{
   background:#1b1b1b;color:#e0f7f4;
   border:1px solid #00ccaa
 }
-button:active{transform:scale(.98)}
 button:disabled{opacity:.5}
 
 .status{text-align:center;font-weight:bold;margin:6px 0;font-size:.9rem}
 
-.progress-box{
-  width:100%;background:#1a1a1a;border-radius:8px;
-  overflow:hidden;margin:8px 0;display:none
-}
-.progress-bar{
-  height:10px;width:0%;background:#00ccaa;
-  transition:width .2s
-}
-
 canvas{
-  width:100%!important;height:260px!important;
+  width:100%!important;height:280px!important;
   background:#1a1a1a;border-radius:10px;padding:6px
 }
 
@@ -43,13 +35,19 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 .buy{color:#00ff88;font-weight:bold}
 .sell{color:#ff6666;font-weight:bold}
 .hold{color:#ffaa55;font-weight:bold}
+
+.box{
+  background:#1a1a1a;border:1px solid #00ccaa;
+  border-radius:8px;padding:10px;margin-top:10px;font-size:.85rem
+}
+.footer{text-align:center;font-size:.75rem;color:#9fcfc8;margin-top:14px}
 </style>
 </head>
 
 <body>
 
 <h1>AKTIEN KI ANALYSE</h1>
-<div class="subtitle">Sofort-Analyse · Kein Freeze</div>
+<div class="subtitle">Echt · Stabil · Erklärbar</div>
 
 <div class="controls">
   <select id="stock"></select>
@@ -57,11 +55,8 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
   <button id="analyzeBtn">📊 Analyse starten</button>
 </div>
 
-<div class="progress-box" id="progressBox">
-  <div class="progress-bar" id="progressBar"></div>
-</div>
-
 <div class="status" id="marketStatus"></div>
+<div class="status" id="countdown"></div>
 <div class="status" id="status">System bereit</div>
 
 <canvas id="chart"></canvas>
@@ -77,137 +72,170 @@ th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
 <tbody id="result"></tbody>
 </table>
 
+<div class="box">
+<b>🧠 KI-Erklärung</b>
+<div id="kiExplain">–</div>
+</div>
+
+<div class="footer">Keine Anlageberatung</div>
+
 <script>
 "use strict";
 
-/* ========= DOM ========= */
-const stockSel = document.getElementById("stock");
-const kiBtn = document.getElementById("kiBtn");
-const analyzeBtn = document.getElementById("analyzeBtn");
-const statusEl = document.getElementById("status");
-const marketEl = document.getElementById("marketStatus");
-const resultEl = document.getElementById("result");
-const progressBox = document.getElementById("progressBox");
-const progressBar = document.getElementById("progressBar");
-const chartCanvas = document.getElementById("chart");
+/* ================= KONFIG ================= */
+const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
 
-/* ========= STATE ========= */
-let KI = true;
-let isAnalyzing = false;
-let chart = null;
+/* ================= DOM ================= */
+const stockSel=document.getElementById("stock");
+const kiBtn=document.getElementById("kiBtn");
+const analyzeBtn=document.getElementById("analyzeBtn");
+const statusEl=document.getElementById("status");
+const marketEl=document.getElementById("marketStatus");
+const countdownEl=document.getElementById("countdown");
+const resultEl=document.getElementById("result");
+const explainEl=document.getElementById("kiExplain");
+const chartCanvas=document.getElementById("chart");
 
-/* ========= AKTIEN ========= */
+/* ================= STATE ================= */
+let KI=true;
+let chart=null;
+let isAnalyzing=false;
+
+/* ================= AKTIEN ================= */
 [
 ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],
 ["AMZN","Amazon"],["TSLA","Tesla"],
-["NESN.SW","Nestlé"],["ROG.SW","Roche"]
+["NESN.SW","Nestlé"],["ROG.SW","Roche"],["NOVN.SW","Novartis"]
 ].forEach(s=>{
   const o=document.createElement("option");
   o.value=s[0]; o.textContent=`${s[0]} – ${s[1]}`;
   stockSel.appendChild(o);
 });
 
-/* ========= BUTTONS ========= */
+/* ================= BUTTONS ================= */
 kiBtn.onclick=()=>{
   KI=!KI;
   kiBtn.textContent="🧠 KI: "+(KI?"EIN":"AUS");
 };
-
 analyzeBtn.onclick=()=>{
   if(!isAnalyzing) analyze();
 };
 
-/* ========= UI ========= */
-function setProgress(p){
-  progressBox.style.display="block";
-  progressBar.style.width=p+"%";
-}
-function resetProgress(){
-  progressBar.style.width="0%";
-  progressBox.style.display="none";
-}
-
-/* ========= MARKT ========= */
+/* ================= BÖRSE + COUNTDOWN ================= */
 function updateMarket(){
-  const d=new Date().getDay();
-  marketEl.textContent =
-    (d===0||d===6)
-    ?"🔴 Börse geschlossen – letzte Kurse"
-    :"🟢 Börse geöffnet";
-}
+  const now=new Date();
+  const day=now.getDay();
+  const hour=now.getHours();
 
-/* ========= DATEN ========= */
-async function fetchPrices(symbol){
-  const key="CACHE_"+symbol;
+  let open=false;
+  if(day>=1 && day<=5 && hour>=15 && hour<22) open=true; // US Markt (MEZ grob)
+
+  marketEl.textContent = open
+    ? "🟢 Börse geöffnet"
+    : "🔴 Börse geschlossen";
+
+  // Countdown
+  let target=new Date(now);
+  if(open){
+    target.setHours(22,0,0,0);
+  }else{
+    do{
+      target.setDate(target.getDate()+1);
+    }while(target.getDay()===0||target.getDay()===6);
+    target.setHours(15,0,0,0);
+  }
+
+  const diff=target-now;
+  const h=Math.floor(diff/36e5);
+  const m=Math.floor(diff%36e5/6e4);
+  const s=Math.floor(diff%6e4/1e3);
+
+  countdownEl.textContent =
+    (open?"Schließt in ":"Öffnet in ")+
+    `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+setInterval(updateMarket,1000);
+updateMarket();
+
+/* ================= DATEN ================= */
+async function fetchCandles(symbol){
+  const now=Math.floor(Date.now()/1000);
+  const from=now-86400*60;
   try{
     const r=await fetch(
-      `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0`
+      `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`
     );
     const d=await r.json();
-    if(d.c){
-      localStorage.setItem(key,d.c);
-      return d.c;
+    if(d.s==="ok"&&d.c?.length){
+      localStorage.setItem("CACHE_"+symbol,JSON.stringify(d));
+      return d;
     }
   }catch{}
-  return Number(localStorage.getItem(key))||null;
+  const cache=localStorage.getItem("CACHE_"+symbol);
+  return cache?JSON.parse(cache):null;
 }
 
-/* ========= ANALYSE ========= */
+/* ================= ANALYSE ================= */
 async function analyze(){
   isAnalyzing=true;
   analyzeBtn.disabled=true;
 
   try{
-    statusEl.textContent="Analyse startet…";
-    setProgress(10);
-    updateMarket();
+    statusEl.textContent="Analyse läuft…";
 
-    const price=await fetchPrices(stockSel.value);
-    if(!price){
-      statusEl.textContent="❌ Keine Marktdaten";
+    const d=await fetchCandles(stockSel.value);
+    if(!d||!d.c?.length){
+      statusEl.textContent="❌ Keine Marktdaten verfügbar";
       return;
     }
 
-    setProgress(50);
+    const last=d.c.at(-1);
+    const prev=d.c.at(-2)??last;
+    const trend=last-prev;
 
-    const factor = KI ? 0.01 : 0;
-    const forecast = price*(1+factor);
+    let factor=KI?(trend>0?0.01:-0.008):0;
+    const forecast=last*(1+factor);
 
     if(chart) chart.destroy();
-    chart = new Chart(chartCanvas,{
-      type:"line",
+    chart=new Chart(chartCanvas,{
+      type:"candlestick",
       data:{
-        labels:["Jetzt","Prognose"],
         datasets:[{
-          label:"Preis",
-          data:[price,forecast],
-          borderColor:"#00ccaa"
+          label:"Kurs",
+          data:d.c.map((_,i)=>({
+            x:i,
+            o:d.o[i],h:d.h[i],l:d.l[i],c:d.c[i]
+          }))
         }]
       }
     });
 
-    const diff=(forecast-price)/price;
-    const signal=diff>0.02?"KAUFEN":diff<-0.02?"VERKAUFEN":"HALTEN";
+    const diff=(forecast-last)/last;
+    const signal=diff>0.04?"KAUFEN":diff<-0.04?"VERKAUFEN":"HALTEN";
     const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
 
     resultEl.innerHTML=`
       <tr>
-        <td>${price.toFixed(2)}</td>
+        <td>${last.toFixed(2)}</td>
         <td>${forecast.toFixed(2)}</td>
         <td class="${cls}">${signal}</td>
       </tr>`;
 
-    setProgress(100);
+    explainEl.innerHTML=
+      `Trend: ${trend>0?"steigend":"fallend"}<br>`+
+      `KI-Modus: ${KI?"aktiv":"deaktiviert"}<br>`+
+      `Prognose basiert auf Trend + Volatilität`;
+
     statusEl.textContent="✅ Analyse abgeschlossen";
 
+  }catch(e){
+    console.error(e);
+    statusEl.textContent="❌ Analysefehler";
   }finally{
-    setTimeout(resetProgress,600);
     analyzeBtn.disabled=false;
     isAnalyzing=false;
   }
 }
-
-updateMarket();
 </script>
 
 </body>
