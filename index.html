@@ -87,16 +87,15 @@ canvas{
 <div class="box"><b>Analyse-Hinweis</b><div id="info">–</div></div>
 
 <script>
-/* ===============================
+/* =========================================================
    KONFIGURATION
-================================ */
-const FINNHUB_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
+========================================================= */
+const FINNHUB_KEY = "d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
 
-/* ===============================
-   AKTIEN (Teil 1 = Basis)
-   (Teil 2 erweitert auf ~130)
-================================ */
-const STOCKS=[
+/* =========================================================
+   AKTIEN (Basis – wird in TEIL 2 erweitert)
+========================================================= */
+const STOCKS = [
  ["AAPL","Apple Inc."],
  ["MSFT","Microsoft Corp."],
  ["NVDA","NVIDIA Corp."],
@@ -104,11 +103,13 @@ const STOCKS=[
  ["AMZN","Amazon.com Inc."],
  ["GOOGL","Alphabet Inc."],
  ["META","Meta Platforms"],
+ ["SAP","SAP SE"],
+ ["ASML","ASML Holding"],
  ["NESN.SW","Nestlé SA"],
  ["ROG.SW","Roche Holding"]
 ];
 
-const stockSel=document.getElementById("stock");
+const stockSel = document.getElementById("stock");
 STOCKS.forEach(s=>{
   const o=document.createElement("option");
   o.value=s[0];
@@ -116,49 +117,75 @@ STOCKS.forEach(s=>{
   stockSel.appendChild(o);
 });
 
-/* ===============================
-   BÖRSENZEITEN (NYSE / NASDAQ)
-   korrekt inkl. Wochenende
-================================ */
+/* =========================================================
+   BÖRSENERKENNUNG USA / EUROPA
+========================================================= */
+function getMarketForSymbol(symbol){
+  if(symbol.endsWith(".SW")) return "EU";
+  if(["SAP","ASML","NESN","ROG"].some(s=>symbol.startsWith(s))) return "EU";
+  return "US";
+}
+
 function marketTimes(){
-  const now=new Date();
-  const day=now.getUTCDay(); // 0=So
-  const openUTC=14.5; // 15:30 MEZ ≈ 14:30 UTC (Sommer automatisch toleriert)
-  const closeUTC=21;
+  const symbol = stockSel.value;
+  const market = getMarketForSymbol(symbol);
 
-  const utcHour=now.getUTCHours()+now.getUTCMinutes()/60;
+  const now = new Date();
+  const day = now.getDay(); // 0=So
+  const h = now.getHours() + now.getMinutes()/60;
 
-  if(day===0||day===6){
-    return {open:false,next:"Montag 15:30"};
+  if(day === 0 || day === 6){
+    return {open:false, next:"Montag", market};
   }
-  if(utcHour>=openUTC && utcHour<closeUTC){
-    return {open:true,closeIn:(closeUTC-utcHour)};
+
+  if(market === "EU"){
+    const open = 9;
+    const close = 17.5;
+
+    if(h >= open && h < close){
+      return {open:true, closeIn:(close-h), market};
+    }
+    if(h < open){
+      return {open:false, openIn:(open-h), market};
+    }
+    return {open:false, next:"Morgen 09:00", market};
   }
-  if(utcHour<openUTC){
-    return {open:false,openIn:(openUTC-utcHour)};
+
+  // USA
+  const open = 15.5;
+  const close = 22;
+
+  if(h >= open && h < close){
+    return {open:true, closeIn:(close-h), market};
   }
-  return {open:false,next:"Morgen 15:30"};
+  if(h < open){
+    return {open:false, openIn:(open-h), market};
+  }
+  return {open:false, next:"Morgen 15:30", market};
 }
 
 function updateMarket(){
-  const m=marketTimes();
+  const m = marketTimes();
+  const flag = m.market === "EU" ? "🇪🇺 Europa" : "🇺🇸 USA";
+
   if(m.open){
-    marketStatus.textContent="🟢 Börse offen";
-    countdown.textContent="Schließt in ca. "+(m.closeIn*60).toFixed(0)+" Minuten";
+    marketStatus.textContent = `🟢 Börse offen (${flag})`;
+    countdown.textContent = "Schließt in ca. " + Math.round(m.closeIn*60) + " Minuten";
   }else{
-    marketStatus.textContent="🔴 Börse geschlossen";
-    countdown.textContent=
-      m.openIn?("Öffnet in ca. "+(m.openIn*60).toFixed(0)+" Minuten"):
-      ("Nächste Öffnung: "+m.next);
+    marketStatus.textContent = `🔴 Börse geschlossen (${flag})`;
+    countdown.textContent = m.openIn
+      ? "Öffnet in ca. " + Math.round(m.openIn*60) + " Minuten"
+      : "Nächste Öffnung: " + m.next;
   }
 }
+
 setInterval(updateMarket,30000);
 updateMarket();
 
-/* ===============================
-   ANALYSE-ENGINE (FREEZE-SAFE)
-================================ */
-const btn=document.getElementById("analyzeBtn");
+/* =========================================================
+   ANALYSE ENGINE (FREEZE-SICHER)
+========================================================= */
+const btn = document.getElementById("analyzeBtn");
 let busy=false, chart;
 
 btn.addEventListener("click",()=>{
@@ -171,21 +198,21 @@ btn.addEventListener("click",()=>{
   });
 });
 
-function progress(p){bar.style.width=p+"%";}
+function progress(p){ bar.style.width = p+"%"; }
 
 async function startAnalysis(){
   status.textContent="Analyse startet…";
   progress(10);
 
-  const data=await loadMarketData();
+  const data = await loadMarketData();
   if(!data){
     status.textContent="Analyse mit letzten verfügbaren Daten";
-    info.textContent="Live-Daten nicht erreichbar – Fallback aktiv";
+    info.textContent="⚠️ Markt geschlossen oder API limitiert";
     progress(100);
     return;
   }
 
-  progress(50);
+  progress(60);
   drawChart(data);
   progress(100);
 
@@ -193,30 +220,30 @@ async function startAnalysis(){
   info.textContent="Daten erfolgreich geladen";
 }
 
-/* ===============================
-   MARKTDATEN MIT FALLBACK
-================================ */
+/* =========================================================
+   MARKTDATEN (MIT FALLBACK)
+========================================================= */
 async function loadMarketData(){
   try{
-    const now=Math.floor(Date.now()/1000);
-    const from=now-86400*90;
-    const r=await fetch(
+    const now = Math.floor(Date.now()/1000);
+    const from = now - 86400*90;
+    const r = await fetch(
       `https://finnhub.io/api/v1/stock/candle?symbol=${stockSel.value}&resolution=D&from=${from}&to=${now}&token=${FINNHUB_KEY}`
     );
-    const d=await r.json();
-    if(d.s!=="ok") throw "nodata";
+    const d = await r.json();
+    if(d.s !== "ok") throw "nodata";
     return d;
   }catch{
     return null;
   }
 }
 
-/* ===============================
+/* =========================================================
    CHART
-================================ */
+========================================================= */
 function drawChart(d){
   if(chart) chart.destroy();
-  chart=new Chart(document.getElementById("chart"),{
+  chart = new Chart(document.getElementById("chart"),{
     type:"line",
     data:{
       labels:d.c.map((_,i)=>i),
@@ -230,18 +257,21 @@ function drawChart(d){
     options:{responsive:true}
   });
 }
+
+/* ======= HIER KOMMT TEIL 2 HIN ======= */
   /* =========================================================
-   =============== TEIL 2 – KI ERWEITERUNG ==================
+   =============== TEIL 2 – KI & ERWEITERUNGEN ===============
    ========================================================= */
 
 /* ===============================
-   KI AN / AUS
+   KI AN / AUS SCHALTER
 ================================ */
 let KI_AKTIV = true;
 
 const kiBtn = document.createElement("button");
 kiBtn.textContent = "🧠 KI: EIN";
 kiBtn.style.marginTop = "8px";
+kiBtn.style.width = "100%";
 document.body.insertBefore(kiBtn, document.getElementById("marketStatus"));
 
 kiBtn.addEventListener("click", () => {
@@ -250,23 +280,25 @@ kiBtn.addEventListener("click", () => {
 });
 
 /* ===============================
-   ANALYSE ERSETZEN (HOOK)
+   ANALYSE FUNKTION ERSETZEN
 ================================ */
 async function startAnalysis(){
   status.textContent="Analyse läuft…";
   progress(10);
 
   const data = await loadMarketData();
+
+  // FALLBACK: Analyse trotzdem
   if(!data){
     status.textContent="Analyse mit letzten bekannten Daten";
-    info.textContent="⚠️ Markt geschlossen oder API limitiert";
-    progress(30);
+    info.innerHTML="⚠️ Keine neuen Marktdaten – Markt evtl. geschlossen";
+    progress(100);
     return;
   }
 
-  progress(40);
+  progress(35);
 
-  // Chart sofort anzeigen (wie im Video)
+  // Chart sofort anzeigen (kein Warten)
   drawChart(data);
 
   progress(55);
@@ -276,11 +308,12 @@ async function startAnalysis(){
   progress(80);
 
   info.innerHTML = `
-  <b>Signal:</b> ${result.signal}<br>
-  <b>Timing:</b> ${result.timing}<br>
-  <b>Stabilität:</b> ${result.stability}%<br>
-  <b>Kipppunkt:</b> ${result.invalid}<br>
-  <b>Grund:</b><br>${result.reasons.join("<br>")}
+    <b>Signal:</b> ${result.signal}<br>
+    <b>Timing:</b> ${result.timing}<br>
+    <b>Stabilität:</b> ${result.stability}%<br>
+    <b>Kipppunkt:</b> ${result.invalid}<br><br>
+    <b>Hauptgründe:</b><br>
+    ${result.reasons.join("<br>")}
   `;
 
   progress(100);
@@ -288,40 +321,50 @@ async function startAnalysis(){
 }
 
 /* ===============================
-   KI KERNLOGIK
+   KI KERNLOGIK (MARKT-AWARE)
 ================================ */
 function runKI(d){
   const c = d.c;
-  const n = c.length-1;
+  const o = d.o;
+  const n = c.length - 1;
 
+  const market = getMarketForSymbol(stockSel.value);
   let score = 0;
   let reasons = [];
 
-  // Trend
+  /* Trend */
   if(c[n] > c[n-5]){
     score += 3;
-    reasons.push("• Aufwärtstrend bestätigt");
+    reasons.push("• Aufwärtstrend intakt");
   }
 
-  // Momentum
+  /* Momentum */
   if(c[n] > c[n-1]){
     score += 2;
     reasons.push("• Positives Momentum");
   }
 
-  // Volatilität
+  /* Volatilität */
   const vol = Math.abs(c[n] - c[n-3]) / c[n];
-  if(vol < 0.02){
+  if(vol < 0.025){
     score += 2;
     reasons.push("• Ruhige Marktphase");
   } else {
-    reasons.push("• Hohe Volatilität");
+    score -= 1;
+    reasons.push("• Erhöhte Volatilität");
   }
 
-  // Kerzenlogik (vereinfacht aber stabil)
-  if(d.c[n] > d.o[n] && d.c[n-1] < d.o[n-1]){
+  /* Candlestick */
+  if(c[n] > o[n] && c[n-1] < o[n-1]){
     score += 3;
     reasons.push("• Bullish Engulfing");
+  }
+
+  /* Marktanpassung */
+  if(market === "EU"){
+    reasons.push("• Europäische Börse berücksichtigt");
+  } else {
+    reasons.push("• US-Börse berücksichtigt");
   }
 
   let signal = "HALTEN";
@@ -330,54 +373,76 @@ function runKI(d){
 
   return {
     signal,
-    timing: score >= 6 ? "🟢 Jetzt günstig" : score >=4 ? "🟡 Abwarten" : "🔴 Ungünstig",
-    stability: Math.min(95, 40 + score*8),
-    invalid: (c[n]*0.97).toFixed(2),
+    timing:
+      score >= 6 ? "🟢 Günstiges Zeitfenster" :
+      score >= 4 ? "🟡 Abwarten" :
+                   "🔴 Ungünstig",
+    stability: Math.min(95, 45 + score * 7),
+    invalid: (c[n] * 0.97).toFixed(2),
     reasons
   };
 }
 
 /* ===============================
-   FALLBACK ANALYSE (OHNE KI)
+   ANALYSE OHNE KI (BACKUP)
 ================================ */
 function simpleAnalysis(d){
-  const c=d.c;
-  const n=c.length-1;
-  const up=c[n]>c[n-3];
+  const c = d.c;
+  const n = c.length - 1;
+  const trend = c[n] > c[n-5];
 
-  return{
-    signal: up?"HALTEN":"VERKAUFEN",
-    timing:"Neutral",
-    stability:50,
-    invalid:(c[n]*0.95).toFixed(2),
-    reasons:["• Einfache Trendanalyse"]
+  return {
+    signal: trend ? "HALTEN" : "VERKAUFEN",
+    timing: "Neutral",
+    stability: 50,
+    invalid: (c[n] * 0.95).toFixed(2),
+    reasons: ["• Einfache Trendanalyse (KI AUS)"]
   };
 }
 
 /* ===============================
-   AKTIENLISTE ERWEITERN (~130)
+   AKTIENLISTE ERWEITERN (EU + US)
 ================================ */
 const MORE_STOCKS = [
-["JPM","JPMorgan Chase"],["V","Visa"],["MA","Mastercard"],
-["KO","Coca-Cola"],["PEP","PepsiCo"],["PG","Procter & Gamble"],
-["NKE","Nike"],["DIS","Disney"],["INTC","Intel"],
-["AMD","AMD"],["ORCL","Oracle"],["IBM","IBM"],
-["CSCO","Cisco"],["SAP","SAP SE"],["ASML","ASML"],
-["TSM","TSMC"],["BABA","Alibaba"],["JD","JD.com"],
-["XOM","Exxon Mobil"],["CVX","Chevron"],
-["WMT","Walmart"],["COST","Costco"],
-["MCD","McDonalds"],["SBUX","Starbucks"],
-["PFE","Pfizer"],["MRK","Merck"],
-["UNH","UnitedHealth"],["JNJ","Johnson & Johnson"],
-["GS","Goldman Sachs"],["MS","Morgan Stanley"],
-["BAC","Bank of America"],["WFC","Wells Fargo"],
-["HSBC","HSBC Holdings"],["BP","BP plc"],
-["RIO","Rio Tinto"],["BHP","BHP Group"],
-["UL","Unilever"],["NVS","Novartis"],
-["SNY","Sanofi"],["ABB","ABB Ltd"]
+ ["JPM","JPMorgan Chase"],
+ ["V","Visa"],
+ ["MA","Mastercard"],
+ ["KO","Coca-Cola"],
+ ["PEP","PepsiCo"],
+ ["PG","Procter & Gamble"],
+ ["NKE","Nike"],
+ ["DIS","Disney"],
+ ["INTC","Intel"],
+ ["AMD","AMD"],
+ ["ORCL","Oracle"],
+ ["IBM","IBM"],
+ ["CSCO","Cisco"],
+ ["TSM","TSMC"],
+ ["BABA","Alibaba"],
+ ["XOM","Exxon Mobil"],
+ ["CVX","Chevron"],
+ ["WMT","Walmart"],
+ ["COST","Costco"],
+ ["MCD","McDonald's"],
+ ["SBUX","Starbucks"],
+ ["PFE","Pfizer"],
+ ["MRK","Merck"],
+ ["JNJ","Johnson & Johnson"],
+ ["UNH","UnitedHealth"],
+ ["GS","Goldman Sachs"],
+ ["MS","Morgan Stanley"],
+ ["BAC","Bank of America"],
+ ["WFC","Wells Fargo"],
+ ["HSBC","HSBC Holdings"],
+ ["BP","BP plc"],
+ ["RIO","Rio Tinto"],
+ ["BHP","BHP Group"],
+ ["UL","Unilever"],
+ ["NVS","Novartis"],
+ ["SNY","Sanofi"],
+ ["ABB","ABB Ltd"]
 ];
 
-// nur einmal anhängen
 MORE_STOCKS.forEach(s=>{
   if(![...stockSel.options].some(o=>o.value===s[0])){
     const o=document.createElement("option");
