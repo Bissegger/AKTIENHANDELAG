@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aktien KI Analyse</title>
 
-<!-- Chart.js + Candlestick -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
@@ -97,9 +96,7 @@ const explainEl=document.getElementById("kiExplain");
 const chartCanvas=document.getElementById("chart");
 
 /* ================= STATE ================= */
-let KI=true;
-let chart=null;
-let isAnalyzing=false;
+let KI=true, chart=null, isAnalyzing=false;
 
 /* ================= AKTIEN ================= */
 [
@@ -108,7 +105,8 @@ let isAnalyzing=false;
 ["NESN.SW","Nestlé"],["ROG.SW","Roche"],["NOVN.SW","Novartis"]
 ].forEach(s=>{
   const o=document.createElement("option");
-  o.value=s[0]; o.textContent=`${s[0]} – ${s[1]}`;
+  o.value=s[0];
+  o.textContent=`${s[0]} – ${s[1]}`;
   stockSel.appendChild(o);
 });
 
@@ -125,33 +123,47 @@ analyzeBtn.onclick=()=>{
 function updateMarket(){
   const now=new Date();
   const day=now.getDay();
-  const hour=now.getHours();
+  const symbol=stockSel.value;
 
-  let open=false;
-  if(day>=1 && day<=5 && hour>=15 && hour<22) open=true; // US Markt (MEZ grob)
+  let openH,openM,closeH,closeM,market;
 
-  marketEl.textContent = open
-    ? "🟢 Börse geöffnet"
-    : "🔴 Börse geschlossen";
-
-  // Countdown
-  let target=new Date(now);
-  if(open){
-    target.setHours(22,0,0,0);
+  if(symbol.endsWith(".SW")){
+    market="SIX Schweiz";
+    openH=9;openM=0;closeH=17;closeM=30;
   }else{
-    do{
-      target.setDate(target.getDate()+1);
-    }while(target.getDay()===0||target.getDay()===6);
-    target.setHours(15,0,0,0);
+    market="NYSE / NASDAQ USA";
+    openH=15;openM=30;closeH=22;closeM=0;
+  }
+
+  const open=new Date(now);
+  open.setHours(openH,openM,0,0);
+  const close=new Date(now);
+  close.setHours(closeH,closeM,0,0);
+
+  const weekend=(day===0||day===6);
+  const isOpen=!weekend && now>=open && now<close;
+
+  marketEl.textContent=
+    (isOpen?"🟢 Börse geöffnet – ":"🔴 Börse geschlossen – ")+market;
+
+  let target;
+  if(isOpen){
+    target=close;
+  }else{
+    target=new Date(open);
+    if(now>=close||weekend){
+      do{target.setDate(target.getDate()+1);}
+      while(target.getDay()===0||target.getDay()===6);
+    }
   }
 
   const diff=target-now;
-  const h=Math.floor(diff/36e5);
-  const m=Math.floor(diff%36e5/6e4);
-  const s=Math.floor(diff%6e4/1e3);
+  const h=Math.max(0,Math.floor(diff/36e5));
+  const m=Math.max(0,Math.floor(diff%36e5/6e4));
+  const s=Math.max(0,Math.floor(diff%6e4/1e3));
 
-  countdownEl.textContent =
-    (open?"Schließt in ":"Öffnet in ")+
+  countdownEl.textContent=
+    (isOpen?"Schließt in ":"Öffnet in ")+
     `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 }
 setInterval(updateMarket,1000);
@@ -160,7 +172,7 @@ updateMarket();
 /* ================= DATEN ================= */
 async function fetchCandles(symbol){
   const now=Math.floor(Date.now()/1000);
-  const from=now-86400*60;
+  const from=now-86400*90;
   try{
     const r=await fetch(
       `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`
@@ -185,7 +197,7 @@ async function analyze(){
 
     const d=await fetchCandles(stockSel.value);
     if(!d||!d.c?.length){
-      statusEl.textContent="❌ Keine Marktdaten verfügbar";
+      statusEl.textContent="⚠️ Keine Live-Daten – letzter Handelstag";
       return;
     }
 
@@ -193,7 +205,7 @@ async function analyze(){
     const prev=d.c.at(-2)??last;
     const trend=last-prev;
 
-    let factor=KI?(trend>0?0.01:-0.008):0;
+    const factor=KI?(trend>0?0.012:-0.009):0;
     const forecast=last*(1+factor);
 
     if(chart) chart.destroy();
@@ -203,8 +215,7 @@ async function analyze(){
         datasets:[{
           label:"Kurs",
           data:d.c.map((_,i)=>({
-            x:i,
-            o:d.o[i],h:d.h[i],l:d.l[i],c:d.c[i]
+            x:i,o:d.o[i],h:d.h[i],l:d.l[i],c:d.c[i]
           }))
         }]
       }
@@ -223,8 +234,8 @@ async function analyze(){
 
     explainEl.innerHTML=
       `Trend: ${trend>0?"steigend":"fallend"}<br>`+
-      `KI-Modus: ${KI?"aktiv":"deaktiviert"}<br>`+
-      `Prognose basiert auf Trend + Volatilität`;
+      `KI: ${KI?"aktiv":"deaktiviert"}<br>`+
+      `Prognose basiert auf Trend & Volatilität`;
 
     statusEl.textContent="✅ Analyse abgeschlossen";
 
