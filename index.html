@@ -3,249 +3,185 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aktien KI Analyse</title>
+<title>Next-Gen Aktien KI</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
 <style>
-body{background:#121212;color:#e0f7f4;font-family:Arial;margin:0;padding:14px}
-h1{text-align:center;font-size:1.4rem;margin:6px 0}
-.subtitle{text-align:center;font-size:.85rem;color:#9fd3cc}
+body{background:#0e0e0e;color:#e8fef9;font-family:Arial;margin:0;padding:14px}
+h1{text-align:center;font-size:1.4rem}
+.subtitle{text-align:center;font-size:.8rem;color:#9fd3cc}
 
-.controls{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 select,button{
-  padding:10px;font-size:1rem;border-radius:8px;
-  background:#1b1b1b;color:#e0f7f4;
-  border:1px solid #00ccaa
-}
-button:disabled{opacity:.5}
-
-.status{text-align:center;font-weight:bold;margin:6px 0;font-size:.9rem}
-
-canvas{
-  width:100%!important;height:280px!important;
-  background:#1a1a1a;border-radius:10px;padding:6px
+  width:100%;padding:10px;margin:6px 0;
+  border-radius:8px;background:#1b1b1b;
+  color:#e8fef9;border:1px solid #00ccaa
 }
 
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border:1px solid #00ccaa;padding:6px;text-align:center;font-size:.85rem}
+.status{text-align:center;font-weight:bold;margin:6px 0}
 
-.buy{color:#00ff88;font-weight:bold}
-.sell{color:#ff6666;font-weight:bold}
-.hold{color:#ffaa55;font-weight:bold}
+canvas{height:280px!important;background:#161616;border-radius:10px}
 
 .box{
-  background:#1a1a1a;border:1px solid #00ccaa;
-  border-radius:8px;padding:10px;margin-top:10px;font-size:.85rem
+  border:1px solid #00ccaa;border-radius:8px;
+  padding:10px;margin-top:10px;background:#161616;font-size:.85rem
 }
-.footer{text-align:center;font-size:.75rem;color:#9fcfc8;margin-top:14px}
+
+.good{color:#00ff88}
+.bad{color:#ff6666}
+.neutral{color:#ffaa55}
 </style>
 </head>
 
 <body>
 
-<h1>AKTIEN KI ANALYSE</h1>
-<div class="subtitle">Echt · Stabil · Erklärbar</div>
+<h1>🧠 NEXT-GEN TRADING KI</h1>
+<div class="subtitle">Timing · Kontext · Risiko</div>
 
-<div class="controls">
-  <select id="stock"></select>
-  <button id="kiBtn">🧠 KI: EIN</button>
-  <button id="analyzeBtn">📊 Analyse starten</button>
-</div>
+<select id="stock"></select>
+<button onclick="analyze()">Analyse starten</button>
 
-<div class="status" id="marketStatus"></div>
+<div class="status" id="market"></div>
 <div class="status" id="countdown"></div>
-<div class="status" id="status">System bereit</div>
+<div class="status" id="status">Bereit</div>
 
 <canvas id="chart"></canvas>
 
-<table>
-<thead>
-<tr>
-  <th>Kurs</th>
-  <th>Prognose</th>
-  <th>Signal</th>
-</tr>
-</thead>
-<tbody id="result"></tbody>
-</table>
-
 <div class="box">
-<b>🧠 KI-Erklärung</b>
-<div id="kiExplain">–</div>
+<b>📌 Erkannte Haupt-Signale</b>
+<div id="reasons">–</div>
 </div>
 
-<div class="footer">Keine Anlageberatung</div>
+<div class="box">
+<b>⏱ Timing-KI</b>
+<div id="timing">–</div>
+</div>
+
+<div class="box">
+<b>⚠️ Risiko-KI (Wann kippt das Signal?)</b>
+<div id="risk">–</div>
+</div>
+
+<div class="box">
+<b>🎯 Finale KI-Entscheidung</b>
+<div id="decision">–</div>
+</div>
 
 <script>
-"use strict";
+const API="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
 
-/* ================= KONFIG ================= */
-const API_KEY="d5ohqjhr01qjast6qrjgd5ohqjhr01qjast6qrk0";
-
-/* ================= DOM ================= */
-const stockSel=document.getElementById("stock");
-const kiBtn=document.getElementById("kiBtn");
-const analyzeBtn=document.getElementById("analyzeBtn");
-const statusEl=document.getElementById("status");
-const marketEl=document.getElementById("marketStatus");
-const countdownEl=document.getElementById("countdown");
-const resultEl=document.getElementById("result");
-const explainEl=document.getElementById("kiExplain");
-const chartCanvas=document.getElementById("chart");
-
-/* ================= STATE ================= */
-let KI=true, chart=null, isAnalyzing=false;
-
-/* ================= AKTIEN ================= */
-[
+const STOCKS=[
 ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],
 ["AMZN","Amazon"],["TSLA","Tesla"],
 ["NESN.SW","Nestlé"],["ROG.SW","Roche"],["NOVN.SW","Novartis"]
-].forEach(s=>{
+];
+
+const stock=document.getElementById("stock");
+STOCKS.forEach(s=>{
   const o=document.createElement("option");
-  o.value=s[0];
-  o.textContent=`${s[0]} – ${s[1]}`;
-  stockSel.appendChild(o);
+  o.value=s[0]; o.textContent=s[1];
+  stock.appendChild(o);
 });
 
-/* ================= BUTTONS ================= */
-kiBtn.onclick=()=>{
-  KI=!KI;
-  kiBtn.textContent="🧠 KI: "+(KI?"EIN":"AUS");
-};
-analyzeBtn.onclick=()=>{
-  if(!isAnalyzing) analyze();
-};
-
-/* ================= BÖRSE + COUNTDOWN ================= */
 function updateMarket(){
   const now=new Date();
-  const day=now.getDay();
-  const symbol=stockSel.value;
+  const d=now.getDay();
+  const isCH=stock.value.endsWith(".SW");
 
-  let openH,openM,closeH,closeM,market;
+  const openH=isCH?9:15, openM=isCH?0:30;
+  const closeH=isCH?17:22, closeM=isCH?30:0;
 
-  if(symbol.endsWith(".SW")){
-    market="SIX Schweiz";
-    openH=9;openM=0;closeH=17;closeM=30;
-  }else{
-    market="NYSE / NASDAQ USA";
-    openH=15;openM=30;closeH=22;closeM=0;
-  }
+  const open=new Date(now); open.setHours(openH,openM,0,0);
+  const close=new Date(now); close.setHours(closeH,closeM,0,0);
 
-  const open=new Date(now);
-  open.setHours(openH,openM,0,0);
-  const close=new Date(now);
-  close.setHours(closeH,closeM,0,0);
+  const openNow=(d>=1&&d<=5&&now>=open&&now<close);
 
-  const weekend=(day===0||day===6);
-  const isOpen=!weekend && now>=open && now<close;
+  market.textContent=openNow?"🟢 Börse offen":"🔴 Börse geschlossen";
 
-  marketEl.textContent=
-    (isOpen?"🟢 Börse geöffnet – ":"🔴 Börse geschlossen – ")+market;
-
-  let target;
-  if(isOpen){
-    target=close;
-  }else{
-    target=new Date(open);
-    if(now>=close||weekend){
-      do{target.setDate(target.getDate()+1);}
-      while(target.getDay()===0||target.getDay()===6);
-    }
-  }
+  let target=openNow?close:open;
+  if(!openNow && now>close) target.setDate(target.getDate()+1);
 
   const diff=target-now;
   const h=Math.max(0,Math.floor(diff/36e5));
   const m=Math.max(0,Math.floor(diff%36e5/6e4));
   const s=Math.max(0,Math.floor(diff%6e4/1e3));
 
-  countdownEl.textContent=
-    (isOpen?"Schließt in ":"Öffnet in ")+
+  countdown.textContent=
+    (openNow?"Schließt in ":"Öffnet in ")+
     `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 }
 setInterval(updateMarket,1000);
 updateMarket();
 
-/* ================= DATEN ================= */
-async function fetchCandles(symbol){
+async function fetchCandles(sym){
   const now=Math.floor(Date.now()/1000);
   const from=now-86400*90;
-  try{
-    const r=await fetch(
-      `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${now}&token=${API_KEY}`
-    );
-    const d=await r.json();
-    if(d.s==="ok"&&d.c?.length){
-      localStorage.setItem("CACHE_"+symbol,JSON.stringify(d));
-      return d;
-    }
-  }catch{}
-  const cache=localStorage.getItem("CACHE_"+symbol);
-  return cache?JSON.parse(cache):null;
+  const r=await fetch(
+    `https://finnhub.io/api/v1/stock/candle?symbol=${sym}&resolution=D&from=${from}&to=${now}&token=${API}`
+  );
+  const d=await r.json();
+  return d.s==="ok"?d:null;
 }
 
-/* ================= ANALYSE ================= */
-async function analyze(){
-  isAnalyzing=true;
-  analyzeBtn.disabled=true;
+function analyze(){
+  status.textContent="Analyse läuft…";
 
-  try{
-    statusEl.textContent="Analyse läuft…";
+  fetchCandles(stock.value).then(d=>{
+    if(!d){status.textContent="Keine Daten";return;}
 
-    const d=await fetchCandles(stockSel.value);
-    if(!d||!d.c?.length){
-      statusEl.textContent="⚠️ Keine Live-Daten – letzter Handelstag";
-      return;
+    const c=d.c, o=d.o, h=d.h, l=d.l;
+    const n=c.length-1;
+    const last=c[n], prev=c[n-1];
+
+    let reasons=[], score=0;
+
+    // Candlestick
+    if(Math.abs(c[n]-o[n])<(h[n]-l[n])*0.1){
+      reasons.push("Doji → Unsicherheit");
+      score-=1;
+    }
+    if(c[n]>o[n] && c[n-1]<o[n-1]){
+      reasons.push("Bullish Engulfing");
+      score+=4;
     }
 
-    const last=d.c.at(-1);
-    const prev=d.c.at(-2)??last;
-    const trend=last-prev;
+    // Trend
+    if(last>c[n-5]){reasons.push("Aufwärtstrend");score+=3;}
+    if(last<c[n-5]){reasons.push("Abwärtstrend");score-=3;}
 
-    const factor=KI?(trend>0?0.012:-0.009):0;
-    const forecast=last*(1+factor);
+    // TIMING-KI
+    let timingText="Jetzt guter Zeitpunkt";
+    if(score>=5) timingText="⚠️ Starkes Signal – evtl. Rücksetzer abwarten";
+    if(score<=-4) timingText="❌ Zu spät / fallender Markt";
 
-    if(chart) chart.destroy();
-    chart=new Chart(chartCanvas,{
+    // RISIKO-KI
+    const invalid=score>0?last*0.97:last*1.03;
+    const riskText=
+      `Signal gültig solange Kurs ${score>0?"über":"unter"} ${invalid.toFixed(2)} bleibt`;
+
+    // FINAL
+    let signal="HALTEN";
+    if(score>=4) signal="KAUFEN";
+    if(score<=-4) signal="VERKAUFEN";
+
+    reasonsDiv.innerHTML=reasons.map(r=>"• "+r).join("<br>");
+    timing.innerHTML=timingText;
+    risk.innerHTML=riskText;
+    decision.innerHTML=
+      `Signal: <b>${signal}</b><br>`+
+      `KI-Score: ${(score+10)*5}/100`;
+
+    if(window.chart) chart.destroy();
+    chart=new Chart(chartEl,{
       type:"candlestick",
-      data:{
-        datasets:[{
-          label:"Kurs",
-          data:d.c.map((_,i)=>({
-            x:i,o:d.o[i],h:d.h[i],l:d.l[i],c:d.c[i]
-          }))
-        }]
-      }
+      data:{datasets:[{data:c.map((_,i)=>({
+        x:i,o:o[i],h:h[i],l:l[i],c:c[i]
+      }))}]}
     });
 
-    const diff=(forecast-last)/last;
-    const signal=diff>0.04?"KAUFEN":diff<-0.04?"VERKAUFEN":"HALTEN";
-    const cls=signal==="KAUFEN"?"buy":signal==="VERKAUFEN"?"sell":"hold";
-
-    resultEl.innerHTML=`
-      <tr>
-        <td>${last.toFixed(2)}</td>
-        <td>${forecast.toFixed(2)}</td>
-        <td class="${cls}">${signal}</td>
-      </tr>`;
-
-    explainEl.innerHTML=
-      `Trend: ${trend>0?"steigend":"fallend"}<br>`+
-      `KI: ${KI?"aktiv":"deaktiviert"}<br>`+
-      `Prognose basiert auf Trend & Volatilität`;
-
-    statusEl.textContent="✅ Analyse abgeschlossen";
-
-  }catch(e){
-    console.error(e);
-    statusEl.textContent="❌ Analysefehler";
-  }finally{
-    analyzeBtn.disabled=false;
-    isAnalyzing=false;
-  }
+    status.textContent="Analyse abgeschlossen";
+  });
 }
 </script>
 
