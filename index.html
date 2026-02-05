@@ -1,5 +1,4 @@
-
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -19,6 +18,7 @@ button:disabled{opacity:.6}
 .progress{height:7px;background:#1e2433;border-radius:4px;overflow:hidden;margin-top:6px}
 .progress div{height:100%;width:0%;background:#00ccaa;transition:.3s}
 .box{background:#141822;border:1px solid #00ccaa;border-radius:12px;padding:10px;margin-top:10px}
+.valueBox{display:flex;justify-content:space-between;margin-top:8px;font-weight:bold}
 canvas{margin-top:12px;background:#111;border-radius:12px}
 </style>
 </head>
@@ -26,7 +26,7 @@ canvas{margin-top:12px;background:#111;border-radius:12px}
 <body>
 
 <h1>🧠 KI Markt Analyse 2026</h1>
-<small>Marktverständnis statt Kaufen/Verkaufen</small>
+<small>Marktverständnis · Status · Zukunftsbewertung</small>
 
 <select id="stock"></select>
 <button id="analyzeBtn">🔍 Analyse starten</button>
@@ -36,6 +36,17 @@ canvas{margin-top:12px;background:#111;border-radius:12px}
 <div class="status" id="status">Bereit</div>
 
 <div class="progress"><div id="bar"></div></div>
+
+<div class="box">
+  <div class="valueBox">
+    <span>Aktueller Wert:</span>
+    <span id="currentPrice">–</span>
+  </div>
+  <div class="valueBox">
+    <span>Zukünftiger Status-Wert:</span>
+    <span id="futurePrice">–</span>
+  </div>
+</div>
 
 <canvas id="chart" height="260"></canvas>
 
@@ -47,8 +58,8 @@ canvas{margin-top:12px;background:#111;border-radius:12px}
 <script>
 /* ================= AKTIEN ================= */
 const STOCKS=[
- ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],["TSLA","Tesla"],
- ["AMZN","Amazon"],["GOOGL","Alphabet"],["META","Meta"],
+ ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],
+ ["TSLA","Tesla"],["AMZN","Amazon"],["GOOGL","Alphabet"],
  ["SAP","SAP"],["ASML","ASML"],["NESN","Nestlé"],["ROG","Roche"],["ABB","ABB"]
 ];
 const stockSel=document.getElementById("stock");
@@ -102,22 +113,17 @@ function drawChart(p){
 /* ======= HIER KOMMT TEIL 2 HIN ======= */
 }
 
-/* ================= KI-FEATURES (99,99 % NICHT) ================= */
-
-// 1️⃣ Markt-Struktur-Erkennung
-// 2️⃣ Zeit-Qualität (ob Analyse sinnvoll ist)
-// 3️⃣ Fehler-Zone (wo Analyse ungültig wird)
-// 4️⃣ Markt-Ruhe-Index (Chaos vs. Klarheit)
-
+/* ================= KI-DATEN ================= */
 function generateMarketData(){
- const base=100+Math.random()*40;
+ const base=100+Math.random()*50;
  let p=[base];
- for(let i=0;i<45;i++){
+ for(let i=0;i<50;i++){
   p.push(p[i]+(Math.random()-0.5)*2);
  }
  return p;
 }
 
+/* ================= KI-ANALYSE ================= */
 function KI_ANALYSE(p){
  const n=p.length-1;
  const trend=p[n]-p[n-12];
@@ -126,9 +132,22 @@ function KI_ANALYSE(p){
  const structure=trend>1?"Aufbauend":trend<-1?"Abbauend":"Seitwärts";
  const timeQuality=vol<0.025?"Sehr gut":vol<0.05?"Mittel":"Schlecht";
  const calm=Math.max(0,100-(vol*900));
- const invalid=(p[n]*0.97).toFixed(2);
 
- return{structure,timeQuality,calm,invalid};
+ // Zukunfts-Status-Wert (kein Signal!)
+ let factor=1;
+ if(structure==="Aufbauend") factor+=0.02;
+ if(timeQuality==="Sehr gut") factor+=0.015;
+ if(calm>70) factor+=0.01;
+
+ const future=(p[n]*factor).toFixed(2);
+
+ return{
+  structure,
+  timeQuality,
+  calm,
+  current:p[n].toFixed(2),
+  future
+ };
 }
 
 /* ================= ANALYSE ================= */
@@ -136,6 +155,9 @@ const bar=document.getElementById("bar");
 const status=document.getElementById("status");
 const info=document.getElementById("info");
 const btn=document.getElementById("analyzeBtn");
+const currentPrice=document.getElementById("currentPrice");
+const futurePrice=document.getElementById("futurePrice");
+
 function progress(p){bar.style.width=p+"%";}
 
 btn.onclick=async()=>{
@@ -143,7 +165,7 @@ btn.onclick=async()=>{
  status.textContent="Analyse läuft…";
  progress(25);
 
- await new Promise(r=>setTimeout(r,300)); // kein Freeze
+ await new Promise(r=>setTimeout(r,300)); // Anti-Freeze
 
  const data=generateMarketData();
  drawChart(data);
@@ -151,11 +173,13 @@ btn.onclick=async()=>{
 
  const r=KI_ANALYSE(data);
 
+ currentPrice.textContent = r.current;
+ futurePrice.textContent  = r.future;
+
  info.innerHTML=`
  <b>Marktstruktur:</b> ${r.structure}<br>
  <b>Zeit-Qualität:</b> ${r.timeQuality}<br>
- <b>Markt-Ruhe-Index:</b> ${Math.round(r.calm)}%<br>
- <b>Fehler-Zone:</b> ${r.invalid}
+ <b>Markt-Ruhe-Index:</b> ${Math.round(r.calm)}%
  `;
 
  progress(100);
