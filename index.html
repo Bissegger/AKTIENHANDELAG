@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+
+  <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>KI Aktien Analyse 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KI Markt Analyse 2026</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -13,7 +14,6 @@ h1{text-align:center;font-size:1.4rem;margin:6px 0}
 small{text-align:center;display:block;color:#9cc}
 select,button{width:100%;padding:14px;margin-top:10px;font-size:1rem;border-radius:12px;border:1px solid #00ccaa;background:#141822;color:#e7fdf9}
 button:disabled{opacity:.6}
-button:active{transform:scale(.97)}
 .status{text-align:center;margin-top:8px;font-weight:bold}
 .hint{text-align:center;font-size:.85rem;color:#9cc}
 .progress{height:7px;background:#1e2433;border-radius:4px;overflow:hidden;margin-top:6px}
@@ -25,8 +25,8 @@ canvas{margin-top:12px;background:#111;border-radius:12px}
 
 <body>
 
-<h1>📈 KI Aktien Analyse 2026</h1>
-<small>Live-Daten · KI-Analyse · EU & US Börsen</small>
+<h1>🧠 KI Markt Analyse 2026</h1>
+<small>Marktverständnis statt Kaufen/Verkaufen</small>
 
 <select id="stock"></select>
 <button id="analyzeBtn">🔍 Analyse starten</button>
@@ -40,59 +40,49 @@ canvas{margin-top:12px;background:#111;border-radius:12px}
 <canvas id="chart" height="260"></canvas>
 
 <div class="box">
-  <b>Analyse-Ergebnis</b>
-  <div id="info">–</div>
+<b>KI-Analyse</b>
+<div id="info">–</div>
 </div>
 
 <script>
-/* ================= KONFIG ================= */
-const TWELVE_KEY = "demo"; // eigenen Key hier einsetzen
-const CACHE_MINUTES = 30;
-
 /* ================= AKTIEN ================= */
 const STOCKS=[
  ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],["TSLA","Tesla"],
  ["AMZN","Amazon"],["GOOGL","Alphabet"],["META","Meta"],
- ["SAP","SAP"],["ASML","ASML"],["NESN","Nestlé"],["ROG","Roche"],["ABB","ABB"],
- ["JPM","JPMorgan"],["V","Visa"],["MA","Mastercard"],["KO","Coca-Cola"],
- ["AMD","AMD"],["INTC","Intel"]
+ ["SAP","SAP"],["ASML","ASML"],["NESN","Nestlé"],["ROG","Roche"],["ABB","ABB"]
 ];
-
 const stockSel=document.getElementById("stock");
 STOCKS.forEach(s=>{
-  const o=document.createElement("option");
-  o.value=s[0];
-  o.textContent=s[0]+" – "+s[1];
-  stockSel.appendChild(o);
+ const o=document.createElement("option");
+ o.value=s[0]; o.textContent=s[0]+" – "+s[1];
+ stockSel.appendChild(o);
 });
 
-/* ================= MARKTSTATUS ================= */
+/* ================= MARKTZEITEN ================= */
 function getMarket(sym){
-  return ["SAP","ASML","NESN","ROG","ABB"].includes(sym)?"EU":"US";
+ return ["SAP","ASML","NESN","ROG","ABB"].includes(sym)?"EU":"US";
 }
 function marketTimes(){
-  const m=getMarket(stockSel.value);
-  const n=new Date(),d=n.getDay();
-  const h=n.getHours()+n.getMinutes()/60;
-  if(d===0||d===6) return {open:false,next:"Montag",market:m};
-  if(m==="EU"){
-    if(h>=9&&h<17.5) return {open:true,closeIn:17.5-h,market:m};
-    if(h<9) return {open:false,openIn:9-h,market:m};
-    return {open:false,next:"Morgen 09:00",market:m};
-  }
-  if(h>=15.5&&h<22) return {open:true,closeIn:22-h,market:m};
-  if(h<15.5) return {open:false,openIn:15.5-h,market:m};
-  return {open:false,next:"Morgen 15:30",market:m};
+ const m=getMarket(stockSel.value);
+ const n=new Date(),d=n.getDay();
+ const h=n.getHours()+n.getMinutes()/60;
+ if(d===0||d===6) return {open:false,next:"Montag",market:m};
+ if(m==="EU"){
+  if(h>=9&&h<17.5) return {open:true,closeIn:17.5-h,market:m};
+  if(h<9) return {open:false,openIn:9-h,market:m};
+  return {open:false,next:"Morgen 09:00",market:m};
+ }
+ if(h>=15.5&&h<22) return {open:true,closeIn:22-h,market:m};
+ if(h<15.5) return {open:false,openIn:15.5-h,market:m};
+ return {open:false,next:"Morgen 15:30",market:m};
 }
 function updateMarket(){
-  const m=marketTimes();
-  marketStatus.textContent=
-    (m.open?"🟢 Börse offen":"🔴 Börse geschlossen")+
-    (m.market==="EU"?" (EU)":" (US)");
-  countdown.textContent=m.open
-    ?`Schließt in ${Math.round(m.closeIn*60)} Min`
-    :m.openIn?`Öffnet in ${Math.round(m.openIn*60)} Min`
-    :`Nächste Öffnung: ${m.next}`;
+ const m=marketTimes();
+ marketStatus.textContent=(m.open?"🟢 Offen":"🔴 Geschlossen")+" ("+m.market+")";
+ countdown.textContent=m.open
+  ?`Schließt in ${Math.round(m.closeIn*60)} Min`
+  :m.openIn?`Öffnet in ${Math.round(m.openIn*60)} Min`
+  :`Nächste Öffnung: ${m.next}`;
 }
 setInterval(updateMarket,30000);
 updateMarket();
@@ -100,74 +90,45 @@ stockSel.addEventListener("change",updateMarket);
 
 /* ================= CHART ================= */
 let chart;
-function drawChart(prices){
-  if(chart) chart.destroy();
-  chart=new Chart(document.getElementById("chart"),{
-    type:"line",
-    data:{labels:prices.map((_,i)=>i),
-      datasets:[{data:prices,borderColor:"#00ccaa",tension:.3}]},
-    options:{plugins:{legend:{display:false}},responsive:true}
-  });
+function drawChart(p){
+ if(chart) chart.destroy();
+ chart=new Chart(document.getElementById("chart"),{
+  type:"line",
+  data:{labels:p.map((_,i)=>i),
+    datasets:[{data:p,borderColor:"#00ccaa",tension:.3}]},
+  options:{plugins:{legend:{display:false}},responsive:true}
+ });
+
+/* ======= HIER KOMMT TEIL 2 HIN ======= */
 }
 
-/* ================= CACHE ================= */
-function getCacheKey(sym){return "td_cache_"+sym;}
-function loadFromCache(sym){
-  try{
-    const c=JSON.parse(localStorage.getItem(getCacheKey(sym)));
-    if(c && Date.now()-c.time<CACHE_MINUTES*60000) return c.data;
-  }catch{}
-  return null;
-}
-function saveToCache(sym,data){
-  localStorage.setItem(getCacheKey(sym),JSON.stringify({time:Date.now(),data}));
-}
+/* ================= KI-FEATURES (99,99 % NICHT) ================= */
 
-/* ================= DATEN LADEN ================= */
-async function loadMarketData(){
-  const sym=stockSel.value;
-  const cached=loadFromCache(sym);
-  if(cached) return cached;
-  try{
-    const url=`https://api.twelvedata.com/time_series?symbol=${sym}&interval=1day&outputsize=40&apikey=${TWELVE_KEY}`;
-    const r=await fetch(url);
-    const j=await r.json();
-    if(!j.values) throw 0;
-    const prices=j.values.map(v=>+v.close).reverse();
-    saveToCache(sym,prices);
-    return prices;
-  }catch{
-    return cached || null;
-  }
+// 1️⃣ Markt-Struktur-Erkennung
+// 2️⃣ Zeit-Qualität (ob Analyse sinnvoll ist)
+// 3️⃣ Fehler-Zone (wo Analyse ungültig wird)
+// 4️⃣ Markt-Ruhe-Index (Chaos vs. Klarheit)
+
+function generateMarketData(){
+ const base=100+Math.random()*40;
+ let p=[base];
+ for(let i=0;i<45;i++){
+  p.push(p[i]+(Math.random()-0.5)*2);
+ }
+ return p;
 }
 
-/* ================= KI ================= */
-let KI_AKTIV=true;
-const kiBtn=document.createElement("button");
-kiBtn.textContent="🧠 KI: EIN";
-document.body.insertBefore(kiBtn,marketStatus);
-kiBtn.onclick=()=>{
-  KI_AKTIV=!KI_AKTIV;
-  kiBtn.textContent=KI_AKTIV?"🧠 KI: EIN":"🧠 KI: AUS";
-};
+function KI_ANALYSE(p){
+ const n=p.length-1;
+ const trend=p[n]-p[n-12];
+ const vol=Math.abs(p[n]-p[n-5])/p[n];
 
-function runKI(p){
-  const n=p.length-1;
-  let s=0,r=[];
-  if(p[n]>p[n-5]){s+=3;r.push("• Aufwärtstrend");}
-  if(p[n]>p[n-1]){s+=2;r.push("• Momentum positiv");}
-  const vol=Math.abs(p[n]-p[n-3])/p[n];
-  if(vol<0.03){s+=2;r.push("• Ruhige Phase");}
-  let sig="HALTEN";
-  if(s>=6) sig="KAUFEN";
-  if(s<=2) sig="VERKAUFEN";
-  return{
-    signal:sig,
-    timing:s>=6?"🟢 Guter Zeitpunkt":s>=4?"🟡 Abwarten":"🔴 Schwach",
-    stability:Math.min(95,45+s*7),
-    invalid:(p[n]*0.97).toFixed(2),
-    reasons:r
-  };
+ const structure=trend>1?"Aufbauend":trend<-1?"Abbauend":"Seitwärts";
+ const timeQuality=vol<0.025?"Sehr gut":vol<0.05?"Mittel":"Schlecht";
+ const calm=Math.max(0,100-(vol*900));
+ const invalid=(p[n]*0.97).toFixed(2);
+
+ return{structure,timeQuality,calm,invalid};
 }
 
 /* ================= ANALYSE ================= */
@@ -178,37 +139,30 @@ const btn=document.getElementById("analyzeBtn");
 function progress(p){bar.style.width=p+"%";}
 
 btn.onclick=async()=>{
-  btn.disabled=true;
-  status.textContent="Analyse läuft…";
-  progress(20);
+ btn.disabled=true;
+ status.textContent="Analyse läuft…";
+ progress(25);
 
-  const data=await loadMarketData();
-  if(!data){
-    info.textContent="⚠️ Keine Marktdaten verfügbar";
-    status.textContent="Analyse eingeschränkt";
-    btn.disabled=false;
-    progress(0);
-    return;
-  }
+ await new Promise(r=>setTimeout(r,300)); // kein Freeze
 
-  drawChart(data);
-  progress(60);
+ const data=generateMarketData();
+ drawChart(data);
+ progress(65);
 
-  const r=KI_AKTIV?runKI(data):
-    {signal:"HALTEN",timing:"Neutral",stability:50,invalid:"–",reasons:["KI AUS"]};
+ const r=KI_ANALYSE(data);
 
-  info.innerHTML=`
-    <b>Signal:</b> ${r.signal}<br>
-    <b>Timing:</b> ${r.timing}<br>
-    <b>Stabilität:</b> ${r.stability}%<br>
-    <b>Kipppunkt:</b> ${r.invalid}<br><br>
-    ${r.reasons.join("<br>")}
-  `;
-  progress(100);
-  status.textContent="✅ Analyse abgeschlossen";
-  btn.disabled=false;
+ info.innerHTML=`
+ <b>Marktstruktur:</b> ${r.structure}<br>
+ <b>Zeit-Qualität:</b> ${r.timeQuality}<br>
+ <b>Markt-Ruhe-Index:</b> ${Math.round(r.calm)}%<br>
+ <b>Fehler-Zone:</b> ${r.invalid}
+ `;
+
+ progress(100);
+ status.textContent="✅ Analyse abgeschlossen";
+ btn.disabled=false;
 };
-</script>
 
+</script>
 </body>
 </html>
