@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -6,74 +7,37 @@
 <title>KI Aktien Analyse 2026</title>
 
 <style>
-body{
-  background:#0f1115;
-  color:#e7fdf9;
-  font-family:system-ui;
-  margin:0;
-  padding:12px
-}
+body{background:#0f1115;color:#e7fdf9;font-family:system-ui;margin:0;padding:12px}
 h1{text-align:center;font-size:1.4rem;margin:6px 0}
 small{text-align:center;display:block;color:#9cc}
 
 select,button{
-  width:100%;
-  padding:14px;
-  margin-top:10px;
-  font-size:1rem;
-  border-radius:12px;
-  border:1px solid #00ccaa;
-  background:#141822;
-  color:#e7fdf9
+  width:100%;padding:14px;margin-top:10px;font-size:1rem;
+  border-radius:12px;border:1px solid #00ccaa;
+  background:#141822;color:#e7fdf9
 }
 button:disabled{opacity:.6}
 
 .status{text-align:center;margin-top:8px;font-weight:bold}
 .hint{text-align:center;font-size:.85rem;color:#9cc}
 
-.progress{
-  height:7px;
-  background:#1e2433;
-  border-radius:4px;
-  overflow:hidden;
-  margin-top:6px
-}
-.progress div{
-  height:100%;
-  width:0%;
-  background:#00ccaa;
-  transition:.3s
-}
+.progress{height:7px;background:#1e2433;border-radius:4px;overflow:hidden;margin-top:6px}
+.progress div{height:100%;width:0%;background:#00ccaa;transition:.3s}
 
-.box{
-  background:#141822;
-  border:1px solid #00ccaa;
-  border-radius:12px;
-  padding:10px;
-  margin-top:10px
-}
+.box{background:#141822;border:1px solid #00ccaa;border-radius:12px;padding:10px;margin-top:10px}
 
-.value{
-  text-align:center;
-  font-size:1.2rem;
-  margin-top:8px
-}
+.value{text-align:center;font-size:1.1rem;margin-top:6px}
 
-canvas{
-  margin-top:12px;
-  background:#111;
-  border-radius:12px
-}
+canvas{margin-top:12px;background:#111;border-radius:12px}
 </style>
 </head>
 
 <body>
 
 <h1>KI Aktien Analyse 2026</h1>
-<small>Echte Marktdaten • Selbstlernende KI • Browser-AI</small>
+<small>Echte Marktdaten • Lokale KI • Twelve Data</small>
 
 <select id="stock"></select>
-
 <button id="analyzeBtn">🔍 Analyse starten</button>
 
 <div class="status" id="marketStatus">Marktstatus…</div>
@@ -81,17 +45,18 @@ canvas{
 
 <div class="value" id="currentValue">Aktueller Wert: –</div>
 <div class="value" id="futureValue">Prognose: –</div>
+<div class="value" id="futureDate">Prognose-Datum: –</div>
 
 <div class="status" id="status">Bereit</div>
-
 <div class="progress"><div id="bar"></div></div>
 
 <canvas id="chart" height="260"></canvas>
 
 <div class="box">
-  <b>KI-Analyse</b>
+  <b>KI-Analyse (lokal lernend)</b>
   <div id="info">–</div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 /* ================= AKTIEN ================= */
@@ -99,76 +64,68 @@ const STOCKS=[
  ["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","NVIDIA"],
  ["TSLA","Tesla"],["AMZN","Amazon"],["GOOGL","Alphabet"],
  ["META","Meta"],["SAP","SAP"],["ASML","ASML"],
- ["NESN","Nestlé"],["ROG","Roche"],["ABB","ABB"],
- ["JPM","JPMorgan"],["V","Visa"],["MA","Mastercard"],
- ["KO","Coca-Cola"],["AMD","AMD"],["INTC","Intel"]
+ ["NESN","Nestlé"],["ROG","Roche"],["ABB","ABB"]
 ];
-
 const stockSel=document.getElementById("stock");
 STOCKS.forEach(s=>{
   const o=document.createElement("option");
-  o.value=s[0];
-  o.textContent=s[0]+" – "+s[1];
+  o.value=s[0]; o.textContent=s[0]+" – "+s[1];
   stockSel.appendChild(o);
 });
 
 /* ================= MARKTZEITEN ================= */
-function marketInfo(sym){
-  const EU=["SAP","ASML","NESN","ROG","ABB"];
-  const now=new Date(),d=now.getDay();
+function updateMarket(){
+  const now=new Date();
+  const d=now.getDay();
   const h=now.getHours()+now.getMinutes()/60;
-  const isEU=EU.includes(sym);
+  const EU=["SAP","ASML","NESN","ROG","ABB"].includes(stockSel.value);
 
   if(d===0||d===6){
-    return {open:false,text:"Wochenende – öffnet Montag"};
+    marketStatus.textContent="🔴 Börse geschlossen";
+    countdown.textContent="Wochenende";
+    return;
   }
-
-  if(isEU){
-    if(h>=9&&h<17.5) return {open:true,text:`EU offen – schließt in ${Math.round((17.5-h)*60)} Min`};
-    if(h<9) return {open:false,text:`EU öffnet in ${Math.round((9-h)*60)} Min`};
-    return {open:false,text:"EU öffnet morgen 09:00"};
+  if(EU){
+    if(h>=9&&h<17.5){
+      marketStatus.textContent="🟢 EU Börse offen";
+      countdown.textContent=`Schließt in ${Math.round((17.5-h)*60)} Min`;
+    }else{
+      marketStatus.textContent="🔴 EU Börse geschlossen";
+      countdown.textContent="Öffnet 09:00";
+    }
   }else{
-    if(h>=15.5&&h<22) return {open:true,text:`US offen – schließt in ${Math.round((22-h)*60)} Min`};
-    if(h<15.5) return {open:false,text:`US öffnet in ${Math.round((15.5-h)*60)} Min`};
-    return {open:false,text:"US öffnet morgen 15:30"};
+    if(h>=15.5&&h<22){
+      marketStatus.textContent="🟢 US Börse offen";
+      countdown.textContent=`Schließt in ${Math.round((22-h)*60)} Min`;
+    }else{
+      marketStatus.textContent="🔴 US Börse geschlossen";
+      countdown.textContent="Öffnet 15:30";
+    }
   }
 }
-
-function updateMarket(){
-  const m=marketInfo(stockSel.value);
-  marketStatus.textContent=m.open?"🟢 Börse offen":"🔴 Börse geschlossen";
-  countdown.textContent=m.text;
-}
-setInterval(updateMarket,1000);
+setInterval(updateMarket,60000);
 stockSel.addEventListener("change",updateMarket);
 updateMarket();
 
-/* ================= CHART ================= */
-let chart;
-function drawChart(prices){
-  if(chart) chart.destroy();
-  chart=new Chart(chartEl,{
-    type:"line",
-    data:{
-      labels:prices.map((_,i)=>i),
-      datasets:[{data:prices,borderColor:"#00ccaa",tension:.3}]
-    },
-    options:{plugins:{legend:{display:false}}}
-  });
-}
-const chartEl=document.getElementById("chart");
-
-/* ================= COMMON ================= */
+/* ================= HILFSFUNKTIONEN ================= */
 const bar=document.getElementById("bar");
 const statusEl=document.getElementById("status");
 const info=document.getElementById("info");
 const btn=document.getElementById("analyzeBtn");
 const curVal=document.getElementById("currentValue");
 const futVal=document.getElementById("futureValue");
+const futDate=document.getElementById("futureDate");
 function progress(p){bar.style.width=p+"%";}
 
-/* ================= API ================= */
-const API_KEY="fb30e9c5783845ab83a6e9c57e4d75cd"; // Twelve Data
+function nextTradingDay(){
+  const d=new Date();
+  do{ d.setDate(d.getDate()+1); }
+  while(d.getDay()===0||d.getDay()===6);
+  return d.toLocaleDateString("de-CH");
+}
+
+/* ================= TWELVE DATA ================= */
+const API_KEY="demo";
 async function loadData(sym){
   const url=`https://api.twelvedata.com/time_series?symbol=${sym}&interval=1day&outputsize=40&apikey=${API_KEY}`;
   const r=await fetch(url);
@@ -177,43 +134,47 @@ async function loadData(sym){
   return j.values.map(v=>+v.close).reverse();
 }
 
-/* ================= LERNENDE KI ================= */
-function loadMemory(sym){
-  return JSON.parse(localStorage.getItem("ki_"+sym)||"[]");
-}
-function saveMemory(sym,entry){
-  const m=loadMemory(sym);
-  m.push(entry);
-  if(m.length>200) m.shift();
-  localStorage.setItem("ki_"+sym,JSON.stringify(m));
+/* ================= LOKALE KI ================= */
+function mem(sym){return JSON.parse(localStorage.getItem("KI_"+sym)||"[]")}
+function save(sym,o){
+  const m=mem(sym); m.push(o);
+  if(m.length>200)m.shift();
+  localStorage.setItem("KI_"+sym,JSON.stringify(m));
 }
 function accuracy(sym){
-  const m=loadMemory(sym).filter(x=>x.real);
+  const m=mem(sym).filter(x=>x.real);
   if(m.length<5) return "–";
   const hit=m.filter(x=>Math.sign(x.real-x.start)===Math.sign(x.pred-x.start)).length;
   return Math.round(hit/m.length*100)+" %";
 }
 
 /* ================= PROGNOSE ================= */
-function runKI(prices){
-  const n=prices.length-1;
-  const last=prices[n];
-  const prev=prices[n-1];
-  const trend=(last-prices[n-5])/prices[n-5];
-  const momentum=last-prev;
-  const vol=Math.abs(last-prices[n-3])/last;
+function runKI(p){
+  const n=p.length-1;
+  const trend=(p[n]-p[n-5])/p[n-5];
+  const mom=p[n]-p[n-1];
+  const vol=Math.abs(p[n]-p[n-3])/p[n];
+  let d=(trend*0.6)+(mom/p[n]*0.3)-(vol*0.2);
+  d=Math.max(-0.05,Math.min(0.05,d));
+  return p[n]*(1+d);
+}
 
-  let delta=(trend*0.6)+(momentum/last*0.3)-(vol*0.2);
-  delta=Math.max(-0.05,Math.min(0.05,delta));
-
-  return last*(1+delta);
+/* ================= CHART ================= */
+let chart;
+function drawChart(p){
+  if(chart)chart.destroy();
+  chart=new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{labels:p.map((_,i)=>i),datasets:[{data:p,borderColor:"#00ccaa",tension:.3}]},
+    options:{plugins:{legend:{display:false}}}
+  });
 }
 
 /* ================= ANALYSE ================= */
 btn.addEventListener("click",async()=>{
   btn.disabled=true;
   statusEl.textContent="Analyse läuft…";
-  progress(15);
+  progress(20);
 
   try{
     const prices=await loadData(stockSel.value);
@@ -222,19 +183,20 @@ btn.addEventListener("click",async()=>{
     const current=prices.at(-1);
     const future=runKI(prices);
 
-    curVal.textContent="Aktueller Wert: "+current.toFixed(2);
-    futVal.textContent="Prognose nächster Zustand: "+future.toFixed(2);
+    curVal.textContent=`Aktueller Wert: ${current.toFixed(2)}`;
+    futVal.textContent=`Prognosewert: ${future.toFixed(2)}`;
+    futDate.textContent=`Prognose-Datum: ${nextTradingDay()}`;
 
-    saveMemory(stockSel.value,{start:current,pred:future});
+    save(stockSel.value,{start:current,pred:future});
 
     info.innerHTML=`
-      <b>Marktqualität:</b> ${Math.abs(future-current)/current<0.01?"ruhig":"aktiv"}<br>
       <b>KI-Trefferquote:</b> ${accuracy(stockSel.value)}<br>
-      <b>Lernstatus:</b> ${loadMemory(stockSel.value).length} gespeicherte Prognosen
+      <b>Lernstatus:</b> ${mem(stockSel.value).length} lokale Prognosen<br>
+      <b>Modus:</b> echte Daten + lokales Lernen
     `;
 
-    progress(100);
     statusEl.textContent="✅ Analyse abgeschlossen";
+    progress(100);
   }catch{
     statusEl.textContent="⚠️ Keine Marktdaten";
     progress(0);
@@ -245,4 +207,3 @@ btn.addEventListener("click",async()=>{
 
 </body>
 </html>
-
