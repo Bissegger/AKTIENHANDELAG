@@ -1,19 +1,22 @@
-export default function detectRegime(prices) {
-  const ema50 = avg(prices.slice(-50));
-  const ema200 = avg(prices.slice(-200));
-  const vol = volatility(prices.slice(-30));
+export default function detectRegime(prices){
 
-  if (vol > 0.04) return "High Volatility";
-  if (ema50 > ema200 * 1.02) return "Bull";
-  if (ema50 < ema200 * 0.98) return "Bear";
-  return "Neutral";
+  const short = avg(prices.slice(-20));
+  const long = avg(prices.slice(-50));
+
+  const vol = volatility(prices.slice(-20));
+
+  if(vol>0.04) return "High Volatility";
+  if(short>long) return "Bull";
+  if(short<long) return "Bear";
+
+  return "Sideways";
 }
 
-function avg(arr){return arr.reduce((a,b)=>a+b,0)/arr.length}
-function volatility(arr){
+function avg(a){return a.reduce((x,y)=>x+y,0)/a.length;}
+
+function volatility(a){
   let v=0;
-  for(let i=1;i<arr.length;i++){
-    v+=Math.abs(arr[i]-arr[i-1])/arr[i-1];
-  }
-  return v/arr.length;
+  for(let i=1;i<a.length;i++)
+    v+=Math.abs(a[i]-a[i-1])/a[i-1];
+  return v/a.length;
 }
