@@ -2,7 +2,7 @@ const cache = {};
 
 export default async function handler(req, res) {
   const symbol = req.query.symbol?.toUpperCase();
-  const API_KEY = process.env.fb30e9c5783845ab83a6e9c57e4d75cd;
+  const API_KEY = process.env.TWELVE_KEY;
 
   if (!symbol) return res.status(400).json({ error: "No symbol" });
 
