@@ -1,58 +1,44 @@
 import detectRegime from "./regime.js";
 import { RSI } from "./indicators.js";
 import riskScore from "./risk.js";
+import crashRisk from "./crash.js";
 
-export default async function handler(req, res){
+export default async function handler(req,res){
 
-  try{
+  const { prices, days, sentiment } = req.body;
 
-    const { prices, days } = req.body;
+  const regime = detectRegime(prices);
+  const rsi = RSI(prices);
+  const risk = riskScore(prices);
 
-    if(!prices || !days || prices.length < 30){
-      return res.status(400).json({ error: "Not enough data" });
-    }
+  let value = prices.at(-1);
+  const momentum = (prices.at(-1)-prices.at(-20))/prices.at(-20);
 
-    const regime = detectRegime(prices);
-    const rsi = RSI(prices);
-    const risk = riskScore(prices);
+  let weightTrend=0.4;
+  if(regime==="Bull") weightTrend=0.6;
+  if(regime==="Bear") weightTrend=0.2;
 
-    let value = prices.at(-1);
-    const momentum = (prices.at(-1)-prices.at(-20))/prices.at(-20);
-
-    let weightTrend = 0.4;
-    let weightVol = 0.3;
-
-    if(regime === "Bull") weightTrend = 0.6;
-    if(regime === "Bear") weightTrend = 0.2;
-    if(regime === "High Volatility") weightVol = 0.5;
-
-    for(let i=0; i<days; i++){
-      const drift = momentum*weightTrend - risk*0.002;
-      value *= (1+drift);
-    }
-
-    const confidence = calculateConfidence(prices, value);
-
-    res.status(200).json({
-      predicted: value,
-      regime,
-      risk,
-      rsi: Math.round(rsi),
-      confidence
-    });
-
-  }catch(err){
-    res.status(500).json({ error: "Prediction failed" });
+  for(let i=0;i<days;i++){
+    const drift = momentum*weightTrend - risk*0.002 + sentiment*0.01;
+    value *= (1+drift);
   }
+
+  const crash = crashRisk(prices, sentiment);
+  const confidence = calcConfidence(prices,value);
+
+  res.json({
+    predicted:value,
+    regime,
+    risk,
+    rsi:Math.round(rsi),
+    crashRisk:crash,
+    confidence
+  });
 }
 
-
-/* 🔥 Confidence Berechnung */
-function calculateConfidence(prices, predicted){
-  const last = prices.at(-1);
-  const change = Math.abs(predicted - last) / last;
-
-  let confidence = 85 - (change * 100);
-
-  return Math.max(60, Math.min(95, Math.round(confidence)));
+function calcConfidence(prices,pred){
+  const last=prices.at(-1);
+  const change=Math.abs(pred-last)/last;
+  let conf=85-(change*100);
+  return Math.max(60,Math.min(95,Math.round(conf)));
 }
