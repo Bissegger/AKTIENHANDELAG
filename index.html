@@ -1,34 +1,49 @@
-
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KI Trading Pro</title>
+<title>AI Trading Pro C2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body{background:#0f1115;color:#e7fdf9;font-family:system-ui;margin:0;padding:15px}
-h1{text-align:center}
-select,button{width:100%;padding:14px;margin-top:10px;border-radius:12px;border:1px solid #00ffaa;background:#141822;color:white}
+h1{text-align:center;font-size:1.5rem}
+select,button{
+  width:100%;padding:14px;margin-top:10px;
+  border-radius:12px;border:1px solid #00ffaa;
+  background:#141822;color:white;font-size:1rem
+}
 button:disabled{opacity:.6}
-.box{background:#141822;border-radius:12px;padding:10px;margin-top:10px}
+.box{background:#141822;border-radius:12px;padding:12px;margin-top:12px}
 .status{text-align:center;margin-top:10px;font-weight:bold}
 canvas{margin-top:15px;background:#111;border-radius:12px}
+.green{color:#00ff99}
+.red{color:#ff4d4d}
+.orange{color:#ffaa00}
 </style>
 </head>
+
 <body>
 
-<h1>KI Trading Pro</h1>
+<h1>AI Trading Pro C2</h1>
 
 <select id="stock">
-<option value="AAPL">AAPL</option>
-<option value="MSFT">MSFT</option>
-<option value="NVDA">NVDA</option>
-<option value="ABB">ABB</option>
-<option value="SAP">SAP</option>
-<option value="ASML">ASML</option>
-<option value="NESN">NESN</option>
+<option value="AAPL">AAPL (US)</option>
+<option value="MSFT">MSFT (US)</option>
+<option value="NVDA">NVDA (US)</option>
+<option value="TSLA">TSLA (US)</option>
+<option value="AMZN">AMZN (US)</option>
+<option value="META">META (US)</option>
+<option value="GOOGL">GOOGL (US)</option>
+<option value="JPM">JPM (US)</option>
+<option value="V">V (US)</option>
+
+<option value="SAP.DE">SAP (EU)</option>
+<option value="ASML.AS">ASML (EU)</option>
+<option value="NESN.SW">Nestlé (EU)</option>
+<option value="ROG.SW">Roche (EU)</option>
+<option value="ABB.SW">ABB (EU)</option>
 </select>
 
 <select id="horizon">
@@ -39,64 +54,131 @@ canvas{margin-top:15px;background:#111;border-radius:12px}
 
 <button id="analyze">Analyse starten</button>
 
-<div class="status" id="status">Bereit</div>
+<div class="status" id="marketStatus">Marktstatus...</div>
 
 <div class="box" id="results">
-Aktueller Wert: –<br>
+Aktueller Preis: –<br>
 Prognose: –<br>
-Confidence: –
+Prognose-Datum: –<br>
+Confidence: –<br>
+Crash-Risiko: –<br>
+Marktphase: –<br>
+RSI: –<br>
+Risk Score: –
 </div>
 
-<canvas id="chart"></canvas>
+<canvas id="chart" height="260"></canvas>
 
 <script>
 const btn=document.getElementById("analyze");
-const statusEl=document.getElementById("status");
-const resBox=document.getElementById("results");
+const stockSel=document.getElementById("stock");
+const horizon=document.getElementById("horizon");
+const results=document.getElementById("results");
+const statusEl=document.getElementById("marketStatus");
+
 let chart;
+
+/* 🕒 Marktstatus */
+function updateMarketStatus(){
+  const now=new Date();
+  const day=now.getDay();
+  const hour=now.getHours()+now.getMinutes()/60;
+
+  const symbol=stockSel.value;
+  const isEU=symbol.includes(".DE")||symbol.includes(".AS")||symbol.includes(".SW");
+
+  if(day===0||day===6){
+    statusEl.innerHTML="<span class='red'>Börse geschlossen (Wochenende)</span>";
+    return;
+  }
+
+  if(isEU){
+    if(hour>=9&&hour<17.5)
+      statusEl.innerHTML="<span class='green'>EU Markt offen</span>";
+    else
+      statusEl.innerHTML="<span class='red'>EU Markt geschlossen</span>";
+  }else{
+    if(hour>=15.5&&hour<22)
+      statusEl.innerHTML="<span class='green'>US Markt offen</span>";
+    else
+      statusEl.innerHTML="<span class='red'>US Markt geschlossen</span>";
+  }
+}
+
+stockSel.addEventListener("change",updateMarketStatus);
+setInterval(updateMarketStatus,60000);
+updateMarketStatus();
+
+/* 📅 Prognose Datum */
+function futureDate(days){
+  const d=new Date();
+  let count=0;
+  while(count<days){
+    d.setDate(d.getDate()+1);
+    if(d.getDay()!=0&&d.getDay()!=6) count++;
+  }
+  return d.toLocaleDateString("de-CH");
+}
 
 btn.onclick=async()=>{
   btn.disabled=true;
-  statusEl.textContent="Lade Marktdaten...";
+  results.innerHTML="Lade Daten...";
 
   try{
-    const symbol=document.getElementById("stock").value;
-    const days=parseInt(document.getElementById("horizon").value);
+    const symbol=stockSel.value;
+    const days=parseInt(horizon.value);
 
-    const r=await fetch(`/api/stock?symbol=${symbol}`);
-    const data=await r.json();
+    const stockRes=await fetch(`/api/stock?symbol=${symbol}`);
+    const stockData=await stockRes.json();
 
-    if(!data.success) throw "NO DATA";
+    if(stockData.error) throw "No Data";
 
-    const prices=data.prices;
+    const newsRes=await fetch(`/api/news?symbol=${symbol}`);
+    const newsData=await newsRes.json();
+
+    const predRes=await fetch("/api/predict",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        prices:stockData.prices,
+        days,
+        sentiment:newsData.sentiment
+      })
+    });
+
+    const pred=await predRes.json();
 
     if(chart) chart.destroy();
     chart=new Chart(document.getElementById("chart"),{
       type:"line",
-      data:{labels:prices.map((_,i)=>i),
-      datasets:[{data:prices,borderColor:"#00ffaa",tension:.3}]},
+      data:{
+        labels:stockData.prices.map((_,i)=>i),
+        datasets:[{
+          data:stockData.prices,
+          borderColor:"#00ffaa",
+          tension:.3
+        }]
+      },
       options:{plugins:{legend:{display:false}}}
     });
 
-    statusEl.textContent="Berechne KI Prognose...";
+    const crashColor =
+      pred.crashRisk>70?"red":
+      pred.crashRisk>40?"orange":"green";
 
-    const p=await fetch("/api/predict",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({prices,days})
-    });
-
-    const pred=await p.json();
-
-    resBox.innerHTML=`
-      Aktueller Wert: ${prices.at(-1).toFixed(2)}<br>
+    results.innerHTML=`
+      Aktueller Preis: ${stockData.price.toFixed(2)}<br>
       Prognose: ${pred.predicted.toFixed(2)}<br>
-      Confidence: ${pred.confidence}%
+      Prognose-Datum: ${futureDate(days)}<br>
+      Confidence: ${pred.confidence}%<br>
+      Crash-Risiko: <span class="${crashColor}">${pred.crashRisk}%</span><br>
+      Marktphase: ${pred.regime}<br>
+      RSI: ${pred.rsi}<br>
+      Risk Score: ${pred.risk}
     `;
 
-    statusEl.textContent="Analyse abgeschlossen ✅";
-  }catch{
-    statusEl.textContent="⚠️ Keine Marktdaten";
+  }catch(e){
+    results.innerHTML="<span class='red'>Fehler beim Laden der Daten</span>";
   }
 
   btn.disabled=false;
@@ -105,3 +187,5 @@ btn.onclick=async()=>{
 
 </body>
 </html>
+
+
